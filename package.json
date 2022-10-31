@@ -6,6 +6,7 @@
   "author": "thilllon <thilllon970@gmail.com>",
   "license": "MIT",
   "bin": "dist/cli.js",
+  "types": "dist/index.d.ts",
   "publishConfig": {
     "access": "public"
   },
