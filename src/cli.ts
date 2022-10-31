@@ -9,9 +9,9 @@ program
   .command('create', { isDefault: true })
   .alias('c')
   .description('create ngrv files')
-  .option('-d, --directory <dir>', 'directory where the ngrv files will be saved')
+  .option('-d, --directory <directory>', 'directory where the ngrv files will be saved')
   .action(async (opts) => {
-    const directory = opts.dir ?? defaultOptions.directory;
+    const directory = opts.directory ?? defaultOptions.directory;
     engrave({ directory });
   });
 
@@ -19,9 +19,9 @@ program
   .command('read')
   .alias('r')
   .description('Read ngrv files')
-  .option('-d, --directory <dir>', 'directory to read the ngrv files')
+  .option('-d, --directory <directory>', 'directory to read the ngrv files')
   .action(async (opts) => {
-    const directory = opts.dir ?? defaultOptions.directory;
+    const directory = opts.directory ?? defaultOptions.directory;
     readEngrave({ directory });
   });
 
