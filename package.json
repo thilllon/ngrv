@@ -1,9 +1,12 @@
 {
   "name": "ngrv",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "dist/index.js",
-  "repository": "git@github.com:thilllon/ngrv.git",
   "author": "thilllon <thilllon970@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thilllon/ngrv.git"
+  },
   "license": "MIT",
   "bin": "dist/cli.js",
   "types": "dist/index.d.ts",
