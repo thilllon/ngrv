@@ -27,4 +27,4 @@ npx ngrv r -d .ngrv
 
 ## Roadmap
 
-- [ ] add test
+- [x] add test
