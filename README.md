@@ -5,7 +5,12 @@
 
 Engrave build information to the build output. Set environment variables automatically.
 
-## How to use?
+<!-- ##  -->
+<!-- stop running the shell script to save build information. this pakcage craete files that includes build information and read it and set those values into process.env, by CLI and programmatically  -->
+
+## Usage
+
+### CLI
 
 ```sh
 # that's it. nothing else. no need to install.
@@ -27,4 +32,20 @@ npx ngrv r
 # or
 npx ngrv r -d .ngrv
 
+```
+
+### Programmatically
+
+```ts
+import { engrave } from 'ngrv';
+
+// create files with build information
+engrave();
+```
+
+```ts
+import { readEngrave } from 'ngrv';
+
+// read the files and set information into the process.env
+readEngrave();
 ```

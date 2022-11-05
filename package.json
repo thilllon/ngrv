@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest"
+    "test": "jest",
+    "commit": "npx cz"
   },
   "dependencies": {
     "chalk": "4.1.2",
