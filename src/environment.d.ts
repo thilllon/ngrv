@@ -1,6 +1,6 @@
 declare namespace NodeJS {
   interface ProcessEnv {
-    __NGRV_BUILT_AT: string;
-    __NGRV_COMMIT_HASH: string;
+    NGRV_BUILT_AT: string;
+    NGRV_COMMIT_HASH: string;
   }
 }

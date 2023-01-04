@@ -3,8 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 
-const rootDir = process.cwd();
-
 export type NgraveOptions = {
   /**
    * @default .
@@ -13,13 +11,13 @@ export type NgraveOptions = {
 
   /**
    * @filename
-   * @default '__NGRV_BUILT_AT'
+   * @default NGRV_BUILT_AT
    */
   builtAtFile?: string;
 
   /**
    * @filename
-   * @default '__NGRV_COMMIT_HASH'
+   * @default NGRV_COMMIT_HASH
    */
   commitHashFile?: string;
 
@@ -27,16 +25,16 @@ export type NgraveOptions = {
 };
 
 export type Ngrave = {
-  __NGRV_COMMIT_HASH: string;
-  __NGRV_BUILT_AT: string;
+  NGRV_COMMIT_HASH: string;
+  NGRV_BUILT_AT: string;
 };
 
 export const defaultOptions = {
   directory: '.',
-  builtAtFile: '__NGRV_BUILT_AT',
-  commitHashFile: '__NGRV_COMMIT_HASH',
+  builtAtFile: 'NGRV_BUILT_AT',
+  commitHashFile: 'NGRV_COMMIT_HASH',
   silent: false,
-};
+} as const;
 
 export const engrave = (options: NgraveOptions = defaultOptions): Ngrave => {
   const { directory, builtAtFile, commitHashFile, silent } = {
@@ -45,7 +43,7 @@ export const engrave = (options: NgraveOptions = defaultOptions): Ngrave => {
   };
   const envs = {} as Ngrave;
 
-  const folderPath = path.join(rootDir, directory);
+  const folderPath = path.join(process.cwd(), directory);
 
   if (!fs.existsSync(folderPath)) {
     fs.mkdirSync(folderPath);
@@ -53,7 +51,7 @@ export const engrave = (options: NgraveOptions = defaultOptions): Ngrave => {
 
   try {
     /**
-     * @shell echo $(date -u +'%s')>./__NGRV_BUILT_AT
+     * @shell echo $(date -u +'%s')>./NGRV_BUILT_AT
      */
     const builtAt = Date.now().toString().trim();
     const iso = new Date(parseInt(builtAt, 10)).toISOString();
@@ -61,21 +59,21 @@ export const engrave = (options: NgraveOptions = defaultOptions): Ngrave => {
     console.log(chalk.greenBright(`[ngrv] saved at ${fpath}`));
     console.log(chalk.greenBright(`[ngrv] ${builtAtFile}: ${builtAt} (${iso})`));
     fs.writeFileSync(fpath, builtAt, 'utf8');
-    envs.__NGRV_BUILT_AT = builtAt;
+    envs.NGRV_BUILT_AT = builtAt;
   } catch (err: any) {
     console.error(err?.message);
   }
 
   try {
     /**
-     * @shell echo $(git rev-parse HEAD)>./__NGRV_COMMIT_HASH
+     * @shell echo $(git rev-parse HEAD)>./NGRV_COMMIT_HASH
      */
     const commitHash = execSync('git rev-parse HEAD').toString('utf8').trim();
     const fpath = path.join(folderPath, commitHashFile);
     console.log(chalk.greenBright(`[ngrv] saved at ${fpath}`));
     console.log(chalk.greenBright(`[ngrv] ${commitHashFile}: ${commitHash}`));
     fs.writeFileSync(fpath, commitHash, 'utf8');
-    envs.__NGRV_COMMIT_HASH = commitHash;
+    envs.NGRV_COMMIT_HASH = commitHash;
   } catch (err: any) {
     console.error(err?.message);
   }
@@ -90,13 +88,13 @@ export const readEngrave = (options: NgraveOptions = defaultOptions) => {
   };
   const envs = {} as Ngrave;
 
-  const folderPath = path.join(rootDir, directory);
+  const folderPath = path.join(process.cwd(), directory);
 
   try {
     const fpath = path.join(folderPath, builtAtFile);
     const builtAt = fs.readFileSync(fpath, 'utf8').trim();
     process.env[builtAtFile] = builtAt;
-    envs.__NGRV_BUILT_AT = builtAt;
+    envs.NGRV_BUILT_AT = builtAt;
     if (!silent) {
       const iso = new Date(parseInt(builtAt, 10)).toISOString();
       console.log(chalk.greenBright(`[ngrv] read from ${fpath}`));
@@ -110,7 +108,7 @@ export const readEngrave = (options: NgraveOptions = defaultOptions) => {
     const fpath = path.join(folderPath, commitHashFile);
     const commitHash = fs.readFileSync(fpath, 'utf8').trim();
     process.env[commitHashFile] = commitHash;
-    envs.__NGRV_COMMIT_HASH = commitHash;
+    envs.NGRV_COMMIT_HASH = commitHash;
     if (!silent) {
       console.log(chalk.greenBright(`[ngrv] read from ${fpath}`));
       console.log(chalk.greenBright(`[ngrv] ${commitHashFile}: ${commitHash}`));

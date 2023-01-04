@@ -14,11 +14,11 @@ Engrave build information to the build output. Set environment variables automat
 
 ```sh
 # that's it. nothing else. no need to install.
-# default outputs: `__NGRV_BUILT_AT`, `__NGRV_COMMIT_HASH`
+# default outputs: `NGRV_BUILT_AT`, `NGRV_COMMIT_HASH`
 npx ngrv
 
 # if you want to change the directory where ngrv files will be stored to './.ngrv', then
-# default outputs: `./.ngrv/__NGRV_BUILT_AT`, `./.ngrv/__NGRV_COMMIT_HASH`
+# default outputs: `./.ngrv/NGRV_BUILT_AT`, `./.ngrv/NGRV_COMMIT_HASH`
 npx ngrv create -d .ngrv
 
 # or
