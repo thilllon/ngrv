@@ -57,7 +57,7 @@ export const defaultOptions = {
 
 let _silent = false;
 
-const logger = (...arg: any[]) => (_silent ? undefined : console.log(...arg));
+const logger = ((): Console => (_silent ? ({} as any) : console))();
 
 export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
   const { directory, filename, silent } = { ...defaultOptions, ...options };
@@ -90,43 +90,51 @@ export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
     NGRV_NCPUS: ncpus,
   } as const;
 
-  const data = Object.entries(ngrvs)
-    .map(([key, value]) => {
-      process.env[key] = (value ?? '').toString().trim();
-      return `${key}="${value}"`;
-    })
-    .join('\n');
+  try {
+    const data = Object.entries(ngrvs)
+      .map(([key, value]) => {
+        process.env[key] = (value ?? '').toString().trim();
+        return `${key}="${value}"`;
+      })
+      .join('\n');
 
-  const ngrvPath = join(folderPath, filename);
-  writeFileSync(ngrvPath, data, 'utf8');
-  logger(chalk.greenBright(`[ngrv] Saved at ${ngrvPath}`));
+    const ngrvPath = join(folderPath, filename);
+    writeFileSync(ngrvPath, data, 'utf8');
+    logger.log(chalk.greenBright(`[ngrv] Saved at ${ngrvPath}`));
+  } catch (err: any) {
+    logger.error(err?.message);
+  }
 
   return ngrvs;
 };
 
-export const readEngrave = (options: NgrvOptions = defaultOptions) => {
-  const { directory, filename, silent } = { ...defaultOptions, ...options };
-  _silent = silent;
+export const readEngrave = (options: NgrvOptions = defaultOptions): Ngrv | undefined => {
+  try {
+    const { directory, filename, silent } = { ...defaultOptions, ...options };
+    _silent = silent;
 
-  const folderPath = join(process.cwd(), directory);
-  const ngrvPath = join(folderPath, filename);
-  const data = readFileSync(ngrvPath, 'utf8').trim();
-  const ngrvs = data
-    .split('\r\n')
-    .join('\n')
-    .split('\n')
-    .map<{ key: NgrvKey; value: string }>((line) => {
-      const [key, ...others] = line.split('=');
-      const value = others.join('=').slice(1, -1).trim();
-      return { key: key as NgrvKey, value };
-    })
-    .reduce<Ngrv>((acc, { key, value }) => {
-      acc[key] = value;
-      process.env[key] = value;
-      return acc;
-    }, {} as Ngrv);
+    const folderPath = join(process.cwd(), directory);
+    const ngrvPath = join(folderPath, filename);
+    const data = readFileSync(ngrvPath, 'utf8').trim();
+    const ngrvs = data
+      .split('\r\n')
+      .join('\n')
+      .split('\n')
+      .map<{ key: NgrvKey; value: string }>((line) => {
+        const [key, ...others] = line.split('=');
+        const value = others.join('=').slice(1, -1).trim();
+        return { key: key as NgrvKey, value };
+      })
+      .reduce<Ngrv>((acc, { key, value }) => {
+        acc[key] = value;
+        process.env[key] = value;
+        return acc;
+      }, {} as Ngrv);
 
-  logger(chalk.greenBright(`[ngrv] Read from ${ngrvPath}`));
+    logger.log(chalk.greenBright(`[ngrv] Read from ${ngrvPath}`));
 
-  return ngrvs;
+    return ngrvs;
+  } catch (err: any) {
+    logger.error(err?.message);
+  }
 };
