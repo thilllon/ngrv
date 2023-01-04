@@ -9,9 +9,12 @@ program
   .command('create', { isDefault: true })
   .alias('c')
   .description('create ngrv files')
-  .option('-d, --directory <directory>', 'directory where the ngrv files will be saved')
-  .action(async (opts) => {
-    const directory = opts.directory ?? defaultOptions.directory;
+  .option(
+    '-d, --directory <directory>',
+    'directory where the ngrv files will be saved',
+    defaultOptions.directory
+  )
+  .action(async ({ directory }) => {
     engrave({ directory });
   });
 
@@ -19,9 +22,12 @@ program
   .command('read')
   .alias('r')
   .description('Read ngrv files')
-  .option('-d, --directory <directory>', 'directory to read the ngrv files')
-  .action(async (opts) => {
-    const directory = opts.directory ?? defaultOptions.directory;
+  .option(
+    '-d, --directory <directory>',
+    'directory to read the ngrv files',
+    defaultOptions.directory
+  )
+  .action(async ({ directory }) => {
     readEngrave({ directory });
   });
 

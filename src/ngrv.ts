@@ -1,121 +1,132 @@
-import { execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
 import chalk from 'chalk';
+import { execSync } from 'child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import os from 'os';
+import { join } from 'path';
 
-export type NgraveOptions = {
+const NgrvKey = [
+  'NGRV_BUILT_AT',
+  'NGRV_BUILT_AT_ISO',
+  'NGRV_COMMIT_HASH',
+  'NGRV_ENDIANNESS',
+  'NGRV_ARCH',
+  'NGRV_HOMEDIR',
+  'NGRV_TOTALMEM',
+  'NGRV_USERINFO',
+  'NGRV_CPUMODEL',
+  'NGRV_NCPUS',
+] as const;
+
+type NgrvKey = typeof NgrvKey[number];
+
+export type Ngrv = {
+  NGRV_BUILT_AT: string;
+  NGRV_BUILT_AT_ISO: string;
+  NGRV_COMMIT_HASH: string;
+  NGRV_ENDIANNESS: string;
+  NGRV_ARCH: string;
+  NGRV_HOMEDIR: string;
+  NGRV_TOTALMEM: string;
+  NGRV_USERINFO: string;
+  NGRV_CPUMODEL: string;
+  NGRV_NCPUS: string;
+};
+
+export type NgrvOptions = {
   /**
    * @default .
    */
   directory?: string;
 
   /**
-   * @filename
-   * @default NGRV_BUILT_AT
+   * @default NGRV
    */
-  builtAtFile?: string;
+  filename?: string;
 
   /**
-   * @filename
-   * @default NGRV_COMMIT_HASH
+   * @default false
    */
-  commitHashFile?: string;
-
   silent?: boolean;
-};
-
-export type Ngrave = {
-  NGRV_COMMIT_HASH: string;
-  NGRV_BUILT_AT: string;
 };
 
 export const defaultOptions = {
   directory: '.',
-  builtAtFile: 'NGRV_BUILT_AT',
-  commitHashFile: 'NGRV_COMMIT_HASH',
+  filename: '.ngrv',
   silent: false,
 } as const;
 
-export const engrave = (options: NgraveOptions = defaultOptions): Ngrave => {
-  const { directory, builtAtFile, commitHashFile, silent } = {
-    ...defaultOptions,
-    ...options,
-  };
-  const envs = {} as Ngrave;
+let _silent = false;
 
-  const folderPath = path.join(process.cwd(), directory);
+const logger = (...arg: any[]) => (_silent ? undefined : console.log(...arg));
 
-  if (!fs.existsSync(folderPath)) {
-    fs.mkdirSync(folderPath);
-  }
+export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
+  const { directory, filename, silent } = { ...defaultOptions, ...options };
+  _silent = silent;
 
-  try {
-    /**
-     * @shell echo $(date -u +'%s')>./NGRV_BUILT_AT
-     */
-    const builtAt = Date.now().toString().trim();
-    const iso = new Date(parseInt(builtAt, 10)).toISOString();
-    const fpath = path.join(folderPath, builtAtFile);
-    console.log(chalk.greenBright(`[ngrv] saved at ${fpath}`));
-    console.log(chalk.greenBright(`[ngrv] ${builtAtFile}: ${builtAt} (${iso})`));
-    fs.writeFileSync(fpath, builtAt, 'utf8');
-    envs.NGRV_BUILT_AT = builtAt;
-  } catch (err: any) {
-    console.error(err?.message);
-  }
+  const folderPath = join(process.cwd(), directory);
+  mkdirSync(folderPath, { recursive: true });
 
-  try {
-    /**
-     * @shell echo $(git rev-parse HEAD)>./NGRV_COMMIT_HASH
-     */
-    const commitHash = execSync('git rev-parse HEAD').toString('utf8').trim();
-    const fpath = path.join(folderPath, commitHashFile);
-    console.log(chalk.greenBright(`[ngrv] saved at ${fpath}`));
-    console.log(chalk.greenBright(`[ngrv] ${commitHashFile}: ${commitHash}`));
-    fs.writeFileSync(fpath, commitHash, 'utf8');
-    envs.NGRV_COMMIT_HASH = commitHash;
-  } catch (err: any) {
-    console.error(err?.message);
-  }
+  const builtAt = Date.now().toString().trim();
+  const iso = new Date(parseInt(builtAt, 10)).toISOString();
+  const commitHash = execSync('git rev-parse HEAD').toString('utf8').trim();
+  const endianness = os.endianness();
+  const arch = os.arch();
+  const homedir = os.homedir();
+  const totalmem = os.totalmem().toString();
+  const userInfo = JSON.stringify(os.userInfo());
+  const cpumodel = os.cpus()[0].model;
+  const ncpus = os.cpus().length.toString();
 
-  return envs;
+  const ngrvs: Ngrv = {
+    NGRV_BUILT_AT: builtAt,
+    NGRV_BUILT_AT_ISO: iso,
+    NGRV_COMMIT_HASH: commitHash,
+    NGRV_ENDIANNESS: endianness,
+    NGRV_ARCH: arch,
+    NGRV_HOMEDIR: homedir,
+    NGRV_TOTALMEM: totalmem,
+    NGRV_USERINFO: userInfo,
+    NGRV_CPUMODEL: cpumodel,
+    NGRV_NCPUS: ncpus,
+  } as const;
+
+  const data = Object.entries(ngrvs)
+    .map(([key, value]) => {
+      process.env[key] = (value ?? '').toString().trim();
+      return `${key}="${value}"`;
+    })
+    .join('\n');
+
+  const ngrvPath = join(folderPath, filename);
+  writeFileSync(ngrvPath, data, 'utf8');
+  logger(chalk.greenBright(`[ngrv] Saved at ${ngrvPath}`));
+
+  return ngrvs;
 };
 
-export const readEngrave = (options: NgraveOptions = defaultOptions) => {
-  const { directory, builtAtFile, commitHashFile, silent } = {
-    ...defaultOptions,
-    ...options,
-  };
-  const envs = {} as Ngrave;
+export const readEngrave = (options: NgrvOptions = defaultOptions) => {
+  const { directory, filename, silent } = { ...defaultOptions, ...options };
+  _silent = silent;
 
-  const folderPath = path.join(process.cwd(), directory);
+  const folderPath = join(process.cwd(), directory);
+  const ngrvPath = join(folderPath, filename);
+  const data = readFileSync(ngrvPath, 'utf8').trim();
+  const ngrvs = data
+    .split('\r\n')
+    .join('\n')
+    .split('\n')
+    .map<{ key: NgrvKey; value: string }>((line) => {
+      const [key, ...others] = line.split('=');
+      const value = others.join('=').slice(1, -1).trim();
+      return { key: key as NgrvKey, value };
+    })
+    .reduce<Ngrv>((acc, { key, value }) => {
+      acc[key] = value;
+      process.env[key] = value;
+      return acc;
+    }, {} as Ngrv);
 
-  try {
-    const fpath = path.join(folderPath, builtAtFile);
-    const builtAt = fs.readFileSync(fpath, 'utf8').trim();
-    process.env[builtAtFile] = builtAt;
-    envs.NGRV_BUILT_AT = builtAt;
-    if (!silent) {
-      const iso = new Date(parseInt(builtAt, 10)).toISOString();
-      console.log(chalk.greenBright(`[ngrv] read from ${fpath}`));
-      console.log(chalk.greenBright(`[ngrv] ${builtAtFile}: ${builtAt} (${iso})`));
-    }
-  } catch (err: any) {
-    console.error(err?.message);
-  }
+  logger(chalk.greenBright(`[ngrv] Read from ${ngrvPath}`));
 
-  try {
-    const fpath = path.join(folderPath, commitHashFile);
-    const commitHash = fs.readFileSync(fpath, 'utf8').trim();
-    process.env[commitHashFile] = commitHash;
-    envs.NGRV_COMMIT_HASH = commitHash;
-    if (!silent) {
-      console.log(chalk.greenBright(`[ngrv] read from ${fpath}`));
-      console.log(chalk.greenBright(`[ngrv] ${commitHashFile}: ${commitHash}`));
-    }
-  } catch (err: any) {
-    console.error(err?.message);
-  }
-
-  return envs;
+  return ngrvs;
 };

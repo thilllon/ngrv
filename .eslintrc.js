@@ -11,6 +11,8 @@ module.exports = {
     sourceType: 'module',
   },
   plugins: ['@typescript-eslint'],
-  rules: {},
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'off',
+  },
   ignorePatterns: ['node_modules', 'dist', '.eslintrc.js', 'jest.config.js'],
 };
