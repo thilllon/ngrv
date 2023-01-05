@@ -14,7 +14,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "ngrv": "dist/cli.js"
+    "ngrv": "dist/cli.js",
+    "ngrvg": "dist/cli.global.js"
   },
   "files": [
     "dist"

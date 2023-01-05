@@ -12,7 +12,8 @@ const NgrvKey = [
   'NGRV_ARCH',
   'NGRV_HOMEDIR',
   'NGRV_TOTALMEM',
-  'NGRV_USERINFO',
+  'NGRV_USERNAME',
+  'NGRV_SHELL',
   'NGRV_CPUMODEL',
   'NGRV_NCPUS',
 ] as const;
@@ -27,7 +28,8 @@ export type Ngrv = {
   NGRV_ARCH: string;
   NGRV_HOMEDIR: string;
   NGRV_TOTALMEM: string;
-  NGRV_USERINFO: string;
+  NGRV_USERNAME: string;
+  NGRV_SHELL: string;
   NGRV_CPUMODEL: string;
   NGRV_NCPUS: string;
 };
@@ -73,7 +75,8 @@ export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
   const arch = os.arch();
   const homedir = os.homedir();
   const totalmem = os.totalmem().toString();
-  const userInfo = JSON.stringify(os.userInfo());
+  const username = os.userInfo().username;
+  const shell = os.userInfo().shell;
   const cpumodel = os.cpus()[0].model;
   const ncpus = os.cpus().length.toString();
 
@@ -85,7 +88,8 @@ export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
     NGRV_ARCH: arch,
     NGRV_HOMEDIR: homedir,
     NGRV_TOTALMEM: totalmem,
-    NGRV_USERINFO: userInfo,
+    NGRV_USERNAME: username,
+    NGRV_SHELL: shell,
     NGRV_CPUMODEL: cpumodel,
     NGRV_NCPUS: ncpus,
   } as const;

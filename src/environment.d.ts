@@ -7,7 +7,8 @@ declare namespace NodeJS {
     NGRV_ARCH: string;
     NGRV_HOMEDIR: string;
     NGRV_TOTALMEM: string;
-    NGRV_USERINFO: string;
+    NGRV_USERNAME: string;
+    NGRV_SHELL: string;
     NGRV_CPUMODEL: string;
     NGRV_NCPUS: string;
   }

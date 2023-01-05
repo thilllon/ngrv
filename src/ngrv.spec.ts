@@ -19,9 +19,13 @@ test('should be able to read the engrave', async () => {
   engrave();
 
   const ngrvs = readEngrave({ silent: true });
-  Object.entries(ngrvs).forEach(([key, value]) => {
-    expect(process.env[key]).toBe(value);
-  });
+  if (ngrvs) {
+    Object.entries(ngrvs).forEach(([key, value]) => {
+      expect(process.env[key]).toBe(value);
+    });
+  } else {
+    expect(ngrvs).toBeUndefined();
+  }
 });
 
 test('should be configurable fixture location', async () => {
@@ -30,18 +34,22 @@ test('should be configurable fixture location', async () => {
   const ngrvsInit = engrave({ directory, filename });
 
   const ngrvs = readEngrave({ directory, filename });
-  const keys = Object.keys(ngrvs);
+  if (ngrvs) {
+    const keys = Object.keys(ngrvs);
 
-  expect(ngrvsInit).toEqual(ngrvs);
+    expect(ngrvsInit).toEqual(ngrvs);
 
-  expect(new Date(ngrvs.NGRV_BUILT_AT)).not.toBe('Invalid Date');
-  expect(new Date(ngrvs.NGRV_BUILT_AT)).toBeInstanceOf(Date);
+    expect(new Date(ngrvs.NGRV_BUILT_AT)).not.toBe('Invalid Date');
+    expect(new Date(ngrvs.NGRV_BUILT_AT)).toBeInstanceOf(Date);
 
-  expect(ngrvs.NGRV_COMMIT_HASH).toHaveLength(40);
-  expect(ngrvs.NGRV_COMMIT_HASH).toBeDefined();
-  expect(ngrvs.NGRV_COMMIT_HASH).toMatch(/^[0-9a-f]{40}$/);
+    expect(ngrvs.NGRV_COMMIT_HASH).toHaveLength(40);
+    expect(ngrvs.NGRV_COMMIT_HASH).toBeDefined();
+    expect(ngrvs.NGRV_COMMIT_HASH).toMatch(/^[0-9a-f]{40}$/);
 
-  for (const key of keys) {
-    expect(typeof process.env[key]).toBe('string');
+    for (const key of keys) {
+      expect(typeof process.env[key]).toBe('string');
+    }
+  } else {
+    expect(ngrvs).toBeUndefined();
   }
 });
