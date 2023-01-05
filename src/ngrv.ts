@@ -68,16 +68,16 @@ export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
   const folderPath = join(process.cwd(), directory);
   mkdirSync(folderPath, { recursive: true });
 
-  const builtAt = Date.now().toString().trim();
+  const builtAt = Date.now().toString();
   const iso = new Date(parseInt(builtAt, 10)).toISOString();
   const commitHash = execSync('git rev-parse HEAD').toString('utf8').trim();
-  const endianness = os.endianness();
-  const arch = os.arch();
-  const homedir = os.homedir();
+  const endianness = os.endianness() ?? '';
+  const arch = os.arch() ?? '';
+  const homedir = os.homedir() ?? '';
   const totalmem = os.totalmem().toString();
-  const username = os.userInfo().username;
-  const shell = os.userInfo().shell;
-  const cpumodel = os.cpus()[0].model;
+  const username = os.userInfo().username ?? '';
+  const shell = os.userInfo().shell ?? '';
+  const cpumodel = os.cpus()[0].model ?? '';
   const ncpus = os.cpus().length.toString();
 
   const ngrvs: Ngrv = {
@@ -94,12 +94,11 @@ export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
     NGRV_NCPUS: ncpus,
   } as const;
 
+  Object.entries(ngrvs).forEach(([key, value]) => (process.env[key] = value));
+
   try {
     const data = Object.entries(ngrvs)
-      .map(([key, value]) => {
-        process.env[key] = (value ?? '').toString().trim();
-        return `${key}="${value}"`;
-      })
+      .map(([key, value]) => `${key}="${value}"`)
       .join('\n');
 
     const ngrvPath = join(folderPath, filename);
@@ -131,9 +130,10 @@ export const readEngrave = (options: NgrvOptions = defaultOptions): Ngrv | undef
       })
       .reduce<Ngrv>((acc, { key, value }) => {
         acc[key] = value;
-        process.env[key] = value;
         return acc;
       }, {} as Ngrv);
+
+    Object.entries(ngrvs).forEach(([key, value]) => (process.env[key] = value));
 
     logger.log(chalk.greenBright(`[ngrv] Read from ${ngrvPath}`));
 

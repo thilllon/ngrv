@@ -28,7 +28,7 @@ test('should be able to read the engrave', async () => {
   }
 });
 
-test('should be configurable fixture location', async () => {
+test('should be configurable', async () => {
   const directory = testDir1;
   const filename = getRandomString();
   const ngrvsInit = engrave({ directory, filename });
