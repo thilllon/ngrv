@@ -2,7 +2,7 @@
   "name": "example",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsx src/index.ts --outDir dist"
+    "cli": "ngrv"
   },
   "license": "MIT",
   "dependencies": {
