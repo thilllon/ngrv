@@ -16,8 +16,7 @@ Engrave build information and set environment variables automatically.
 - Create `.ngrv` file which contains build information
 
 ```sh
-# That's it! Nothing else.
-# Default outputs: `./.ngrv`
+# That's it! Nothing else. Default outputs will be stored in `./.ngrv`
 npx ngrv
 
 # You can pass the output directory where outputs will be stored
@@ -38,6 +37,8 @@ npx ngrv r -d my_directory
 
 ### Programmatically
 
+- Create `ngrv`
+
 ```ts
 import { engrave } from 'ngrv';
 
@@ -47,10 +48,12 @@ const ngrvs = engrave();
 console.log(ngrvs);
 ```
 
+- Read `ngrv`
+
 ```ts
 import { readEngrave } from 'ngrv';
 
-// read the files and set information into the process.env
+// Read the files and set information into the process.env
 const ngrvs = readEngrave();
 
 console.log(ngrvs);
