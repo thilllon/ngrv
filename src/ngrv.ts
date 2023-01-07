@@ -70,7 +70,7 @@ export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
 
   const builtAt = Date.now().toString();
   const iso = new Date(parseInt(builtAt, 10)).toISOString();
-  const commitHash = execSync('git rev-parse HEAD').toString('utf8').trim();
+  const commitHash = execSync('git rev-parse HEAD || true').toString('utf8').trim();
   const endianness = os.endianness() ?? '';
   const arch = os.arch() ?? '';
   const homedir = os.homedir() ?? '';
