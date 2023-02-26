@@ -14,5 +14,12 @@ module.exports = {
   rules: {
     '@typescript-eslint/no-explicit-any': 'off',
   },
-  ignorePatterns: ['node_modules', 'dist', '.eslintrc.js', 'jest.config.js'],
+  ignorePatterns: [
+    'dist',
+    '.eslintrc.js',
+    'jest.config.*',
+    'commitlint.config.*',
+    'changelog.config.*',
+    '.prettierrc.*',
+  ],
 };

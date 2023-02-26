@@ -12,5 +12,5 @@
     "sourceMap": true,
     "typeRoots": ["node_modules/@types", "src/*.d.ts"]
   },
-  "include": ["src"]
+  "include": ["src", "tests/ngrv.spec.ts"]
 }

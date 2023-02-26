@@ -34,3 +34,5 @@ program
 program.parse(process.argv);
 
 export const cli = program;
+
+export default program;
