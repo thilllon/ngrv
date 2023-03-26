@@ -1,6 +1,6 @@
 {
   "name": "ngrv",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -32,7 +32,7 @@
     "format": "prettier --write --list-different .",
     "prerelease": "pnpm format && pnpm lint && pnpm test && pnpm build",
     "release": "release-it",
-    "release:cli": "release-it --cli",
+    "release:cli": "release-it --only-version",
     "lint": "eslint --fix ."
   },
   "dependencies": {
