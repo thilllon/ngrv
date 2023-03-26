@@ -5,33 +5,33 @@ import os from 'os';
 import { join } from 'path';
 
 const NgrvKey = [
-  'NGRV_BUILT_AT',
-  'NGRV_BUILT_AT_ISO',
-  'NGRV_COMMIT_HASH',
-  'NGRV_ENDIANNESS',
   'NGRV_ARCH',
+  'NGRV_BUILT_AT_ISO',
+  'NGRV_BUILT_AT',
+  'NGRV_COMMIT_HASH',
+  'NGRV_CPUMODEL',
+  'NGRV_ENDIANNESS',
   'NGRV_HOMEDIR',
+  'NGRV_NCPUS',
+  'NGRV_SHELL',
   'NGRV_TOTALMEM',
   'NGRV_USERNAME',
-  'NGRV_SHELL',
-  'NGRV_CPUMODEL',
-  'NGRV_NCPUS',
 ] as const;
 
 type NgrvKey = typeof NgrvKey[number];
 
 export type Ngrv = {
-  NGRV_BUILT_AT: string;
-  NGRV_BUILT_AT_ISO: string;
-  NGRV_COMMIT_HASH: string;
-  NGRV_ENDIANNESS: string;
   NGRV_ARCH: string;
+  NGRV_BUILT_AT_ISO: string;
+  NGRV_BUILT_AT: string;
+  NGRV_COMMIT_HASH: string;
+  NGRV_CPUMODEL: string;
+  NGRV_ENDIANNESS: string;
   NGRV_HOMEDIR: string;
+  NGRV_NCPUS: string;
+  NGRV_SHELL: string;
   NGRV_TOTALMEM: string;
   NGRV_USERNAME: string;
-  NGRV_SHELL: string;
-  NGRV_CPUMODEL: string;
-  NGRV_NCPUS: string;
 };
 
 export type BaseOptions = {
