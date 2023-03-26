@@ -1,9 +1,12 @@
 {
   "git": {
+    "requireCleanWorkingDir": false,
     "commitMessage": "chore: release ${version}"
   },
+  "npm": {},
   "github": {
     "release": true,
-    "autoGenerate": true
+    "autoGenerate": true,
+    "web": true
   }
 }
