@@ -30,7 +30,7 @@
     "test:cov": "jest --coverage",
     "prepare": "husky install && chmod +x .husky/*",
     "format": "prettier --write --list-different .",
-    "release": "pnpm format && pnpm lint && pnpm test && pnpm build && release-it",
+    "release": "pnpm format && pnpm lint && pnpm test && pnpm build && release-it --ci",
     "lint": "eslint --fix ."
   },
   "dependencies": {
