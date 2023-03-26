@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import os from 'os';
@@ -117,7 +116,10 @@ export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv =
         .map(([key, value]) => `${key}="${value}"`)
         .join('\n');
       writeFileSync(ngrvPath, data, 'utf8');
-      logger.log(chalk.greenBright(`[ngrv] Saved at ${ngrvPath}`));
+      logger.log(
+        `%c[ngrv] Saved at ${ngrvPath}`,
+        'color: green; font-size: larger; font-weight: bold;'
+      );
     }
   } catch (err) {
     logger.error(err);
@@ -152,7 +154,10 @@ export const readEngrave = (
 
     Object.entries(ngrvs).forEach(([key, value]) => (process.env[key] = value));
 
-    logger.log(chalk.greenBright(`[ngrv] Read from ${ngrvPath}`));
+    logger.log(
+      `[ngrv] Read from ${ngrvPath}`,
+      'color: green; font-size: larger; font-weight: bold;'
+    );
 
     return ngrvs;
   } catch (err) {

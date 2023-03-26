@@ -24,19 +24,16 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsup",
-    "build:tsc": "tsc",
     "start": "node dist/index.js",
     "test": "jest",
     "test:cov": "jest --coverage",
     "prepare": "husky install && chmod +x .husky/*",
     "format": "prettier --write --list-different .",
     "prerelease": "pnpm format && pnpm lint && pnpm test && pnpm build",
-    "release": "release-it",
-    "release:cli": "release-it --only-version",
+    "release": "release-it --only-version",
     "lint": "eslint --fix ."
   },
   "dependencies": {
-    "chalk": "4.1.2",
     "commander": "^9.4.1"
   },
   "devDependencies": {
