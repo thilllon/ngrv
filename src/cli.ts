@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { defaultOptions, engrave, readEngrave } from './ngrv';
+import { engrave, engraveDefaultOptions, readEngrave, readEngraveDefaultOptions } from './ngrv';
 
 const program = new Command();
 
@@ -12,10 +12,10 @@ program
   .option(
     '-d, --directory <directory>',
     'directory where the ngrv files will be saved',
-    defaultOptions.directory
+    engraveDefaultOptions.outputDirectory
   )
   .action(async ({ directory }) => {
-    engrave({ directory });
+    engrave({ outputDirectory: directory });
   });
 
 program
@@ -25,7 +25,7 @@ program
   .option(
     '-d, --directory <directory>',
     'directory to read the ngrv files',
-    defaultOptions.directory
+    readEngraveDefaultOptions.directory
   )
   .action(async ({ directory }) => {
     readEngrave({ directory });
@@ -33,6 +33,4 @@ program
 
 program.parse(process.argv);
 
-export const cli = program;
-
-export default program;
+export { program as default, program };

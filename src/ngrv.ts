@@ -34,12 +34,7 @@ export type Ngrv = {
   NGRV_NCPUS: string;
 };
 
-export type NgrvOptions = {
-  /**
-   * @default .
-   */
-  directory?: string;
-
+export type BaseOptions = {
   /**
    * @default NGRV
    */
@@ -51,7 +46,27 @@ export type NgrvOptions = {
   silent?: boolean;
 };
 
-export const defaultOptions = {
+export type EngraveOptions = BaseOptions & {
+  /**
+   * @default .
+   */
+  outputDirectory?: string | false;
+};
+
+export type ReadEngraveOptions = BaseOptions & {
+  /**
+   * @default .
+   */
+  directory?: string;
+};
+
+export const engraveDefaultOptions = {
+  outputDirectory: '.',
+  filename: '.ngrv',
+  silent: false,
+} as const;
+
+export const readEngraveDefaultOptions = {
   directory: '.',
   filename: '.ngrv',
   silent: false,
@@ -61,12 +76,9 @@ let _silent = false;
 
 const logger = ((): Console => (_silent ? ({} as any) : console))();
 
-export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
-  const { directory, filename, silent } = { ...defaultOptions, ...options };
+export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv => {
+  const { outputDirectory, filename, silent } = { ...engraveDefaultOptions, ...options };
   _silent = silent;
-
-  const folderPath = join(process.cwd(), directory);
-  mkdirSync(folderPath, { recursive: true });
 
   const builtAt = Date.now().toString();
   const iso = new Date(parseInt(builtAt, 10)).toISOString();
@@ -97,23 +109,28 @@ export const engrave = (options: NgrvOptions = defaultOptions): Ngrv => {
   Object.entries(ngrvs).forEach(([key, value]) => (process.env[key] = value));
 
   try {
-    const data = Object.entries(ngrvs)
-      .map(([key, value]) => `${key}="${value}"`)
-      .join('\n');
-
-    const ngrvPath = join(folderPath, filename);
-    writeFileSync(ngrvPath, data, 'utf8');
-    logger.log(chalk.greenBright(`[ngrv] Saved at ${ngrvPath}`));
-  } catch (err: any) {
-    logger.error(err?.message);
+    if (typeof outputDirectory === 'string') {
+      const folderPath = join(process.cwd(), outputDirectory);
+      mkdirSync(folderPath, { recursive: true });
+      const ngrvPath = join(folderPath, filename);
+      const data = Object.entries(ngrvs)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join('\n');
+      writeFileSync(ngrvPath, data, 'utf8');
+      logger.log(chalk.greenBright(`[ngrv] Saved at ${ngrvPath}`));
+    }
+  } catch (err) {
+    logger.error(err);
   }
 
   return ngrvs;
 };
 
-export const readEngrave = (options: NgrvOptions = defaultOptions): Ngrv | undefined => {
+export const readEngrave = (
+  options: ReadEngraveOptions = readEngraveDefaultOptions
+): Ngrv | undefined => {
   try {
-    const { directory, filename, silent } = { ...defaultOptions, ...options };
+    const { directory, filename, silent } = { ...readEngraveDefaultOptions, ...options };
     _silent = silent;
 
     const folderPath = join(process.cwd(), directory);
@@ -138,7 +155,7 @@ export const readEngrave = (options: NgrvOptions = defaultOptions): Ngrv | undef
     logger.log(chalk.greenBright(`[ngrv] Read from ${ngrvPath}`));
 
     return ngrvs;
-  } catch (err: any) {
-    logger.error(err?.message);
+  } catch (err) {
+    logger.error(err);
   }
 };
