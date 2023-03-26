@@ -1,6 +1,6 @@
 {
   "name": "ngrv",
-  "version": "3.0.2",
+  "version": "3.0.4",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -30,7 +30,9 @@
     "test:cov": "jest --coverage",
     "prepare": "husky install && chmod +x .husky/*",
     "format": "prettier --write --list-different .",
-    "release": "pnpm format && pnpm lint && pnpm test && pnpm build && release-it --ci",
+    "prerelease": "pnpm format && pnpm lint && pnpm test && pnpm build",
+    "release": "release-it",
+    "release:cli": "release-it --cli --otp",
     "lint": "eslint --fix ."
   },
   "dependencies": {
