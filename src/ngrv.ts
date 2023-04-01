@@ -35,7 +35,7 @@ export type Ngrv = {
 
 export type BaseOptions = {
   /**
-   * @default NGRV
+   * @default .ngrv
    */
   filename?: string;
 

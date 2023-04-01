@@ -1,7 +1,7 @@
 {
   "name": "example",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "test": "tsx src/index.ts",
     "cli": "ngrv"
   },
   "license": "MIT",
