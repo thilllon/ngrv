@@ -71,13 +71,8 @@ export const readEngraveDefaultOptions = {
   silent: false,
 } as const;
 
-let _silent = false;
-
-const logger = ((): Console => (_silent ? ({} as any) : console))();
-
 export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv => {
   const { outputDirectory, filename, silent } = { ...engraveDefaultOptions, ...options };
-  _silent = silent;
 
   const builtAt = Date.now().toString();
   const iso = new Date(parseInt(builtAt, 10)).toISOString();
@@ -116,13 +111,15 @@ export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv =
         .map(([key, value]) => `${key}="${value}"`)
         .join('\n');
       writeFileSync(ngrvPath, data, 'utf8');
-      logger.log(
-        `%c[ngrv] Saved at ${ngrvPath}`,
-        'color: green; font-size: larger; font-weight: bold;'
-      );
+      if (!silent) {
+        console.log(
+          `%c[ngrv] Saved at ${ngrvPath}`,
+          'color: green; font-size: larger; font-weight: bold;'
+        );
+      }
     }
   } catch (err) {
-    logger.error(err);
+    console.error(err);
   }
 
   return ngrvs;
@@ -131,10 +128,9 @@ export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv =
 export const readEngrave = (
   options: ReadEngraveOptions = readEngraveDefaultOptions
 ): Ngrv | undefined => {
-  try {
-    const { directory, filename, silent } = { ...readEngraveDefaultOptions, ...options };
-    _silent = silent;
+  const { directory, filename, silent } = { ...readEngraveDefaultOptions, ...options };
 
+  try {
     const folderPath = join(process.cwd(), directory);
     const ngrvPath = join(folderPath, filename);
     const data = readFileSync(ngrvPath, 'utf8').trim();
@@ -154,13 +150,15 @@ export const readEngrave = (
 
     Object.entries(ngrvs).forEach(([key, value]) => (process.env[key] = value));
 
-    logger.log(
-      `[ngrv] Read from ${ngrvPath}`,
-      'color: green; font-size: larger; font-weight: bold;'
-    );
+    if (!silent) {
+      console.log(
+        `[ngrv] Read from ${ngrvPath}`,
+        'color: green; font-size: larger; font-weight: bold;'
+      );
+    }
 
     return ngrvs;
   } catch (err) {
-    logger.error(err);
+    console.error(err);
   }
 };
