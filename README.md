@@ -1,11 +1,12 @@
 # ngrv
 
 [![npm](https://img.shields.io/badge/npm-ngrv-green)](https://www.npmjs.com/package/ngrv)
-[![GitHub issues](https://img.shields.io/github/issues/thilllon/ngrv)](https://github.com/thilllon/ngrv/issues)
+[![issues](https://img.shields.io/github/issues/thilllon/ngrv)](https://github.com/thilllon/ngrv/issues)
+[![size](https://img.shields.io/bundlephobia/minzip/ngrv)](https://www.npmjs.com/package/ngrv)
+[![download](https://img.shields.io/npm/dw/ngrv)](https://www.npmjs.com/package/ngrv)
+[![license](https://img.shields.io/npm/l/ngrv)](https://www.npmjs.com/package/ngrv)
 
-> `ngrv` (called as engrave)
-
-Engrave build information and set environment variables automatically.
+`ngrv` (engrave) engraves build information and registers those as environment variables to `process.env`.
 
 <!-- stop running the shell script to save build information. this pakcage create files that includes build information and read it and set those values into process.env, by CLI and programmatically  -->
 
