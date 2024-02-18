@@ -4,3 +4,4 @@ dist
 coverage
 .ngrv
 tmp
+.DS_Store
