@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { execFileSync } from 'child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { pathToFileURL } from 'url';
@@ -37,6 +47,13 @@ const makeRepository = (
   git(cwd, 'commit', '--quiet', '-m', 'initial');
 
   return { cwd, initialCommit: git(cwd, 'rev-parse', 'HEAD') };
+};
+
+const makeUnbornRepository = (): string => {
+  const cwd = makeTemporaryDirectory();
+  git(cwd, 'init', '--quiet');
+  writeFileSync(join(cwd, 'package.json'), '{"name":"fixture","version":"1.2.3"}', 'utf8');
+  return cwd;
 };
 
 const completeInfo: BuildInfo = {
@@ -123,6 +140,54 @@ describe('collectBuildInfo', () => {
     writeFileSync(join(cwd, 'untracked.txt'), 'changed', 'utf8');
 
     expect(collectBuildInfo({ cwd, env: {}, timestamp: false }).source.dirty).toBe(true);
+  });
+
+  it('does not refresh or lock the Git index while checking dirty state', () => {
+    const { cwd } = makeRepository();
+    const manifest = join(cwd, 'package.json');
+    const index = join(cwd, '.git', 'index');
+    const manifestStat = statSync(manifest);
+    const indexBefore = readFileSync(index);
+    utimesSync(manifest, manifestStat.atime, new Date(manifestStat.mtimeMs + 10_000));
+
+    collectBuildInfo({ cwd, env: {}, timestamp: false });
+
+    expect(readFileSync(index)).toEqual(indexBefore);
+    expect(existsSync(join(cwd, '.git', 'index.lock'))).toBe(false);
+  });
+
+  it('keeps dirty state but omits the unavailable revision for an unborn HEAD', () => {
+    const cwd = makeUnbornRepository();
+
+    expect(collectBuildInfo({ cwd, env: {}, timestamp: false }).source).toEqual({ dirty: true });
+  });
+
+  it('uses explicit and provider revisions when the checkout HEAD is unborn', () => {
+    const cwd = makeUnbornRepository();
+
+    expect(
+      collectBuildInfo({ cwd, env: {}, revision: '7'.repeat(40), timestamp: false }).source
+    ).toEqual({ revision: '7'.repeat(40), dirty: true });
+    expect(
+      collectBuildInfo({
+        cwd,
+        env: { GITHUB_ACTIONS: 'true', GITHUB_SHA: '8'.repeat(40) },
+        timestamp: false,
+      }).source
+    ).toEqual({ revision: '8'.repeat(40), dirty: true });
+  });
+
+  it('reports a broken HEAD as a collection error', () => {
+    const cwd = makeUnbornRepository();
+    const headReference = git(cwd, 'symbolic-ref', 'HEAD');
+    const referenceFile = join(cwd, '.git', headReference);
+    mkdirSync(dirname(referenceFile), { recursive: true });
+    writeFileSync(referenceFile, 'a'.repeat(40), 'utf8');
+
+    expectNgrvError(
+      () => collectBuildInfo({ cwd, env: {}, timestamp: false }),
+      'NGRV_COLLECTION_ERROR'
+    );
   });
 
   it('does not mutate files or the supplied environment', () => {
@@ -217,6 +282,14 @@ describe('collectBuildInfo', () => {
     ).toEqual({ timestamp: '2026-09-21T12:34:56.000Z', timestampSource: 'explicit' });
   });
 
+  it('accepts an ISO offset without fractional seconds and normalizes it to UTC', () => {
+    const cwd = makeTemporaryDirectory();
+
+    expect(
+      collectBuildInfo({ cwd, env: {}, timestamp: '2026-09-21T21:34:56+09:00' }).build
+    ).toEqual({ timestamp: '2026-09-21T12:34:56.000Z', timestampSource: 'explicit' });
+  });
+
   it('uses the collection clock by default', () => {
     const cwd = makeTemporaryDirectory();
     const earliest = Date.now();
@@ -291,6 +364,18 @@ describe('BuildInfo validation and storage', () => {
   });
 
   it.each([
+    ['2026-09-21T12:34:56Z', '2026-09-21T12:34:56.000Z'],
+    ['2026-09-21T21:34:56+09:00', '2026-09-21T12:34:56.000Z'],
+  ])('normalizes valid ISO timestamp %s', (timestamp, expected) => {
+    expect(
+      validateBuildInfo({
+        ...completeInfo,
+        build: { ...completeInfo.build, timestamp },
+      }).build.timestamp
+    ).toBe(expected);
+  });
+
+  it.each([
     ['missing schema', {}],
     ['unsupported schema', { ...completeInfo, schemaVersion: 2 }],
     ['non-object service', { ...completeInfo, service: 'fixture' }],
@@ -299,6 +384,13 @@ describe('BuildInfo validation and storage', () => {
     [
       'invalid timestamp',
       { ...completeInfo, build: { timestamp: 'not-a-date', timestampSource: 'explicit' } },
+    ],
+    [
+      'impossible calendar date',
+      {
+        ...completeInfo,
+        build: { timestamp: '2026-02-30T00:00:00Z', timestampSource: 'explicit' },
+      },
     ],
     [
       'timestamp without source',

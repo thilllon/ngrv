@@ -43,9 +43,25 @@ const optionalNonEmptyString = (
   return value;
 };
 
-const isCanonicalIsoTimestamp = (value: string): boolean => {
+const normalizeIsoTimestamp = (value: string): string => {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) return validationError('build.timestamp must be a valid ISO timestamp');
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysPerMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > daysPerMonth[month - 1]) {
+    return validationError('build.timestamp must be a valid ISO timestamp');
+  }
+
   const milliseconds = Date.parse(value);
-  return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
+  if (!Number.isFinite(milliseconds)) {
+    return validationError('build.timestamp must be a valid ISO timestamp');
+  }
+  return new Date(milliseconds).toISOString();
 };
 
 const validateUrl = (value: string): void => {
@@ -90,9 +106,8 @@ export const validateBuildInfo = (value: unknown): BuildInfo => {
     validationError('source.dirty must be a boolean when present');
   }
   const validatedDirty = dirty as boolean | undefined;
-  if (timestamp !== undefined && !isCanonicalIsoTimestamp(timestamp)) {
-    validationError('build.timestamp must be a valid ISO timestamp');
-  }
+  const normalizedTimestamp =
+    timestamp === undefined ? undefined : normalizeIsoTimestamp(timestamp);
   if (
     timestampSource !== undefined &&
     timestampSource !== 'clock' &&
@@ -117,7 +132,7 @@ export const validateBuildInfo = (value: unknown): BuildInfo => {
       ...(validatedDirty === undefined ? {} : { dirty: validatedDirty }),
     },
     build: {
-      ...(timestamp === undefined ? {} : { timestamp }),
+      ...(normalizedTimestamp === undefined ? {} : { timestamp: normalizedTimestamp }),
       ...(timestampSource === undefined
         ? {}
         : { timestampSource: timestampSource as BuildTimestampSource }),

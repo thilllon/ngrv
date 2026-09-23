@@ -74,6 +74,15 @@ const runGit = (cwd: string, args: string[]): string =>
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
 
+const readHeadRevision = (cwd: string): string | undefined => {
+  try {
+    return runGit(cwd, ['rev-parse', '--verify', '--quiet', 'HEAD']);
+  } catch (error) {
+    if ((error as { status?: unknown }).status === 1) return undefined;
+    throw error;
+  }
+};
+
 const readGitIdentity = (cwd: string): GitIdentity => {
   try {
     if (runGit(cwd, ['rev-parse', '--is-inside-work-tree']) !== 'true') return {};
@@ -83,8 +92,8 @@ const readGitIdentity = (cwd: string): GitIdentity => {
 
   try {
     return {
-      revision: runGit(cwd, ['rev-parse', 'HEAD']),
-      dirty: runGit(cwd, ['status', '--porcelain']).length > 0,
+      revision: readHeadRevision(cwd),
+      dirty: runGit(cwd, ['--no-optional-locks', 'status', '--porcelain']).length > 0,
     };
   } catch (error) {
     throw collectError('Unable to inspect the Git checkout', error);
@@ -114,14 +123,6 @@ const readProviderIdentity = (
   }
 
   return {};
-};
-
-const canonicalExplicitTimestamp = (value: string): string => {
-  const milliseconds = Date.parse(value);
-  if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== value) {
-    throw collectError('timestamp must be a valid ISO timestamp');
-  }
-  return value;
 };
 
 const timestampFromEpoch = (value: string): string => {
@@ -155,7 +156,7 @@ export const collectBuildInfo = (options: CollectBuildInfoOptions = {}): BuildIn
     };
     if (options.timestamp !== false) {
       if (typeof options.timestamp === 'string') {
-        build.timestamp = canonicalExplicitTimestamp(options.timestamp);
+        build.timestamp = options.timestamp;
         build.timestampSource = 'explicit';
       } else if (env.SOURCE_DATE_EPOCH !== undefined) {
         build.timestamp = timestampFromEpoch(env.SOURCE_DATE_EPOCH);
