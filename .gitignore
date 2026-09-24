@@ -3,5 +3,8 @@ dist
 .env*
 coverage
 .ngrv
+build-info.json
+build-info.mjs
+*.tgz
 tmp
 .DS_Store

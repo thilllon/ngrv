@@ -1,9 +1,7 @@
-import type { Config } from 'jest';
-
-const config: Config = {
+/** @type {import('jest').Config} */
+module.exports = {
   testEnvironment: 'node',
   transform: {
     '^.+\\.(t|j)sx?$': '@swc/jest',
   },
 };
-export default config;

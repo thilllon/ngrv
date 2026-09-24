@@ -1,18 +1,36 @@
 {
   "name": "ngrv",
-  "version": "3.0.6",
+  "version": "4.0.0",
+  "description": "Capture build metadata and load it into OpenTelemetry Node.js resources",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
-  "packageManager": "pnpm@7.21.0",
+  "packageManager": "pnpm@8.15.9",
   "author": "thilllon <thilllon970@gmail.com>",
   "repository": {
     "type": "git",
     "url": "https://github.com/thilllon/ngrv.git"
   },
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./otel": {
+      "types": "./dist/otel.d.ts",
+      "import": "./dist/otel.mjs",
+      "require": "./dist/otel.js",
+      "default": "./dist/otel.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "ngrv": "dist/cli.js",
     "ngrv-global": "dist/cli.global.js",
@@ -26,13 +44,18 @@
     "build": "tsup",
     "start": "node dist/index.js",
     "test": "jest",
+    "test:package": "node scripts/package-smoke.cjs",
     "test:cov": "jest --coverage",
-    "test:example": "pnpm build && cd ./example && pnpm install && pnpm test",
+    "test:example": "pnpm build && pnpm --dir example install --frozen-lockfile --ignore-scripts && pnpm --dir example test",
     "prepare": "husky install && chmod +x .husky/*",
     "format": "prettier --write --list-different .",
-    "prerelease": "pnpm format && pnpm lint && pnpm test && pnpm build",
+    "prerelease": "pnpm check && pnpm build && pnpm exec jest --runInBand && pnpm test:package",
     "release": "release-it --only-version",
-    "lint": "eslint --fix ."
+    "lint": "eslint --fix --ext .ts,.js,.cjs,.mjs src tests scripts example/src",
+    "typecheck": "tsc --noEmit",
+    "lint:check": "eslint --ext .ts,.js,.cjs,.mjs src tests scripts example/src",
+    "format:check": "prettier --check .",
+    "check": "pnpm typecheck && pnpm lint:check && pnpm format:check"
   },
   "dependencies": {
     "commander": "^9.4.1"
@@ -41,6 +64,9 @@
     "@commitlint/cli": "^17.4.0",
     "@commitlint/config-conventional": "^17.4.0",
     "@jest/globals": "^29.4.3",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-node": "0.222.0",
     "@swc/core": "^1.3.36",
     "@swc/jest": "^0.2.24",
     "@types/node": "^18.11.18",

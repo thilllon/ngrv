@@ -476,15 +476,24 @@ describe('BuildInfo validation and storage', () => {
 });
 
 describe('toOtelAttributes', () => {
-  it('maps every metadata field to its documented attribute', () => {
+  it('maps standard attributes without exposing custom metadata by default', () => {
     expect(toOtelAttributes(completeInfo)).toEqual({
       'service.name': 'fixture',
       'service.version': '1.2.3',
-      'ngrv.source.revision': 'a'.repeat(40),
+      'vcs.ref.head.revision': 'a'.repeat(40),
+      'cicd.pipeline.run.url.full': 'https://ci.example.test/builds/42',
+    });
+  });
+
+  it('preserves false and includes extra build fields when requested', () => {
+    expect(toOtelAttributes(completeInfo, { includeCustomAttributes: true })).toEqual({
+      'service.name': 'fixture',
+      'service.version': '1.2.3',
+      'vcs.ref.head.revision': 'a'.repeat(40),
       'ngrv.source.dirty': false,
       'ngrv.build.timestamp': '2026-09-21T00:00:00.000Z',
       'ngrv.build.timestamp_source': 'explicit',
-      'ngrv.build.url': 'https://ci.example.test/builds/42',
+      'cicd.pipeline.run.url.full': 'https://ci.example.test/builds/42',
     });
   });
 

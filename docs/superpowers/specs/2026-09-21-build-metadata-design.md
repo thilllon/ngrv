@@ -46,7 +46,7 @@ CPU, memory, arbitrary environment variables, or repository remote credentials.
   `timestamp` (ISO string or false), and `strict`. Read-only collection; no file
   writes, logging, or process.env mutation. Git subprocesses use argument arrays.
 - `src/storage.ts`: `writeBuildInfo(info, options?: { file?: string;
-  format?: 'json' | 'esm' }): string` and
+format?: 'json' | 'esm' }): string` and
   `readBuildInfo(file?: string): BuildInfo`. JSON defaults to `build-info.json`,
   ESM to `build-info.mjs`. Writes create parent directories and atomically replace
   via a same-directory temporary file. Readers parse JSON only, never execute JS.

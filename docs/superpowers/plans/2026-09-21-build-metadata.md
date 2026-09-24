@@ -31,8 +31,10 @@
 
 ```ts
 expect(collectBuildInfo({ cwd, env: {}, timestamp: false })).toMatchObject({
-  schemaVersion: 1, service: { name: 'fixture', version: '1.2.3' },
-  source: { revision: initialCommit, dirty: false }, build: {},
+  schemaVersion: 1,
+  service: { name: 'fixture', version: '1.2.3' },
+  source: { revision: initialCommit, dirty: false },
+  build: {},
 });
 expect(() => collectBuildInfo({ cwd: emptyDir, env: {}, strict: true })).toThrow();
 ```
@@ -42,12 +44,19 @@ expect(() => collectBuildInfo({ cwd: emptyDir, env: {}, strict: true })).toThrow
 - [ ] Add and run boundary tests: missing Git, GitHub/GitLab fallback only when provider markers exist, malformed metadata/manifest/date, epoch zero, explicit timestamp precedence, omitted timestamp, strict missing fields, round-trip JSON, dynamic import of generated ESM, failed writes, missing/corrupt read, no additional sensitive properties, and all OTel mappings with undefined fields omitted.
 
 ```ts
-expect(toOtelAttributes({ schemaVersion: 1,
-  service: { name: 'fixture', version: '1.2.3' },
-  source: { revision: 'a'.repeat(40), dirty: false }, build: {} })).toEqual({
-    'service.name': 'fixture', 'service.version': '1.2.3',
-    'ngrv.source.revision': 'a'.repeat(40), 'ngrv.source.dirty': false,
-  });
+expect(
+  toOtelAttributes({
+    schemaVersion: 1,
+    service: { name: 'fixture', version: '1.2.3' },
+    source: { revision: 'a'.repeat(40), dirty: false },
+    build: {},
+  })
+).toEqual({
+  'service.name': 'fixture',
+  'service.version': '1.2.3',
+  'ngrv.source.revision': 'a'.repeat(40),
+  'ngrv.source.dirty': false,
+});
 ```
 
 - [ ] Run focused tests, existing legacy tests, TypeScript check, and scoped lint/format checks. Commit and report RED/GREEN evidence and API details.
@@ -61,12 +70,30 @@ expect(toOtelAttributes({ schemaVersion: 1,
 - [ ] Replace the existing tautological e2e placeholder with real subprocess tests against built CLI artifacts. Assert generate followed by inspect returns fixture fields, `--otel` yields standard service fields and custom build fields, invalid format/data/missing strict fields/write failures exit nonzero, and legacy `create/read` still round-trip.
 
 ```ts
-const generated = spawnSync(process.execPath, [cli, 'generate', '--cwd', fixture,
-  '--output', artifact, '--name', 'demo', '--service-version', '2.0.0',
-  '--revision', 'b'.repeat(40), '--no-timestamp', '--strict'], { encoding: 'utf8' });
+const generated = spawnSync(
+  process.execPath,
+  [
+    cli,
+    'generate',
+    '--cwd',
+    fixture,
+    '--output',
+    artifact,
+    '--name',
+    'demo',
+    '--service-version',
+    '2.0.0',
+    '--revision',
+    'b'.repeat(40),
+    '--no-timestamp',
+    '--strict',
+  ],
+  { encoding: 'utf8' }
+);
 expect(generated.status).toBe(0);
-const inspected = spawnSync(process.execPath, [cli, 'inspect', artifact, '--otel'],
-  { encoding: 'utf8' });
+const inspected = spawnSync(process.execPath, [cli, 'inspect', artifact, '--otel'], {
+  encoding: 'utf8',
+});
 expect(JSON.parse(inspected.stdout)['service.version']).toBe('2.0.0');
 ```
 
