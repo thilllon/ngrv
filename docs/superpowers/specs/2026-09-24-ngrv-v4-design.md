@@ -46,5 +46,6 @@ Regression tests cover standard mapping, opt-in custom fields, lazy JSON reads,
 file URLs, missing/malformed files, no runtime Git/OS probing, and the new default
 CLI. Run an actual NodeSDK against the packed package and inspect exported spans.
 Use frozen pnpm 8 installation and Node 22/24 checks, build, tests, package smoke.
-Work in an isolated v4 checkout; no merge, npm publication, or GitHub release is
-part of this local update request.
+Work in an isolated v4 checkout. The implementation was initially prepared locally;
+the user's subsequent request extends completion to merging into `main` and
+publishing version 4.0.0 to npm, with registry verification after release.

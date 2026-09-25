@@ -1,6 +1,6 @@
 {
   "name": "ngrv",
-  "version": "4.0.0",
+  "version": "3.0.6",
   "description": "Capture build metadata and load it into OpenTelemetry Node.js resources",
   "license": "MIT",
   "publishConfig": {
