@@ -14,6 +14,12 @@ const runCli = (...args: string[]) =>
   spawnSync(process.execPath, [cli, ...args], {
     cwd: temporaryDirectory,
     encoding: 'utf8',
+    env: {
+      ...process.env,
+      GITHUB_ACTIONS: 'false',
+      GITLAB_CI: 'false',
+      SOURCE_DATE_EPOCH: undefined,
+    },
   });
 
 beforeAll(() => {
