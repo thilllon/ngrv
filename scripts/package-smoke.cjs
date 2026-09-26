@@ -47,7 +47,7 @@ try {
       dependencies: { commander: '9.4.1', ngrv: `file:${archive}` },
     })
   );
-  run('pnpm', ['install', '--offline', '--ignore-scripts', '--no-frozen-lockfile']);
+  run('pnpm', ['install', '--prefer-offline', '--ignore-scripts', '--no-frozen-lockfile']);
 
   const commonJs = `
 const assert = require('assert/strict');

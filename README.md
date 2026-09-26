@@ -9,7 +9,9 @@ identity, without needing Git in production.
 Version 4 changes the bare `ngrv` command to generate JSON. See [migration](#migrating-from-v3).
 Tested on Node.js 22 and 24 with OpenTelemetry Resources 2.x.
 
-## Install
+## Usage
+
+### Capture metadata during the build
 
 ```sh
 pnpm add ngrv@^4
@@ -26,7 +28,7 @@ pnpm exec ngrv generate --cwd . --output dist/build-info.json --strict
 The generated file describes the build. Do not add deployment environment or deployment time to it;
 those values change independently of the immutable artifact.
 
-## OpenTelemetry
+### Register the detector in NodeSDK()
 
 Install the OpenTelemetry SDK pieces used by your application. NGRV supplies the resource detector;
 your application owns its exporters, instrumentation, and SDK lifecycle.
