@@ -1,0 +1,22 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: mise exec -- pnpm lint
+    format:
+      run: mise exec -- pnpm format:check
+    secrets:
+      run: mise exec -- gitleaks git --pre-commit --staged --redact --no-banner
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: mise exec -- pnpm exec commitlint --edit {1}
+
+pre-push:
+  parallel: true
+  commands:
+    build:
+      run: mise exec -- pnpm build
+    types:
+      run: mise exec -- pnpm typecheck

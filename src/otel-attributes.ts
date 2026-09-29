@@ -1,4 +1,4 @@
-import { BuildInfo, validateBuildInfo } from './build-info';
+import { BuildInfo, validateBuildInfo } from "./build-info";
 
 export type OtelAttributes = Record<string, string | boolean>;
 
@@ -10,25 +10,33 @@ export interface OtelAttributeOptions {
 /** Maps metadata using OTel semantic conventions 1.44.0 (VCS/CI/CD are RC). */
 export const toOtelAttributes = (
   value: BuildInfo,
-  options: OtelAttributeOptions = {}
+  options: OtelAttributeOptions = {},
 ): OtelAttributes => {
   const info = validateBuildInfo(value);
   const attributes: OtelAttributes = {};
 
-  if (info.service.name !== undefined) attributes['service.name'] = info.service.name;
-  if (info.service.version !== undefined) attributes['service.version'] = info.service.version;
-  if (info.source.revision !== undefined) {
-    attributes['vcs.ref.head.revision'] = info.source.revision;
+  if (info.service.name !== undefined) {
+    attributes["service.name"] = info.service.name;
   }
-  if (info.build.url !== undefined) attributes['cicd.pipeline.run.url.full'] = info.build.url;
+  if (info.service.version !== undefined) {
+    attributes["service.version"] = info.service.version;
+  }
+  if (info.source.revision !== undefined) {
+    attributes["vcs.ref.head.revision"] = info.source.revision;
+  }
+  if (info.build.url !== undefined) {
+    attributes["cicd.pipeline.run.url.full"] = info.build.url;
+  }
 
   if (options.includeCustomAttributes) {
-    if (info.source.dirty !== undefined) attributes['ngrv.source.dirty'] = info.source.dirty;
+    if (info.source.dirty !== undefined) {
+      attributes["ngrv.source.dirty"] = info.source.dirty;
+    }
     if (info.build.timestamp !== undefined) {
-      attributes['ngrv.build.timestamp'] = info.build.timestamp;
+      attributes["ngrv.build.timestamp"] = info.build.timestamp;
     }
     if (info.build.timestampSource !== undefined) {
-      attributes['ngrv.build.timestamp_source'] = info.build.timestampSource;
+      attributes["ngrv.build.timestamp_source"] = info.build.timestampSource;
     }
   }
 

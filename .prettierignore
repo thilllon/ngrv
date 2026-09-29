@@ -1,4 +1,6 @@
-.superpowers
-dist
 node_modules
+dist
 pnpm-lock.yaml
+.superpowers
+.ngrv
+tmp

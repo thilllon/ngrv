@@ -1,23 +1,23 @@
-import { execSync } from 'child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import os from 'os';
-import { join } from 'path';
+import { execSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import { join } from "node:path";
 
 const NgrvKey = [
-  'NGRV_ARCH',
-  'NGRV_BUILT_AT_ISO',
-  'NGRV_BUILT_AT',
-  'NGRV_COMMIT_HASH',
-  'NGRV_CPUMODEL',
-  'NGRV_ENDIANNESS',
-  'NGRV_HOMEDIR',
-  'NGRV_NCPUS',
-  'NGRV_SHELL',
-  'NGRV_TOTALMEM',
-  'NGRV_USERNAME',
+  "NGRV_ARCH",
+  "NGRV_BUILT_AT_ISO",
+  "NGRV_BUILT_AT",
+  "NGRV_COMMIT_HASH",
+  "NGRV_CPUMODEL",
+  "NGRV_ENDIANNESS",
+  "NGRV_HOMEDIR",
+  "NGRV_NCPUS",
+  "NGRV_SHELL",
+  "NGRV_TOTALMEM",
+  "NGRV_USERNAME",
 ] as const;
 
-type NgrvKey = typeof NgrvKey[number];
+type NgrvKey = (typeof NgrvKey)[number];
 
 export type Ngrv = {
   NGRV_ARCH: string;
@@ -60,30 +60,37 @@ export type ReadEngraveOptions = BaseOptions & {
 };
 
 export const engraveDefaultOptions = {
-  outputDirectory: '.',
-  filename: '.ngrv',
+  outputDirectory: ".",
+  filename: ".ngrv",
   silent: false,
 } as const;
 
 export const readEngraveDefaultOptions = {
-  directory: '.',
-  filename: '.ngrv',
+  directory: ".",
+  filename: ".ngrv",
   silent: false,
 } as const;
 
-export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv => {
-  const { outputDirectory, filename, silent } = { ...engraveDefaultOptions, ...options };
+export const engrave = (
+  options: EngraveOptions = engraveDefaultOptions,
+): Ngrv => {
+  const { outputDirectory, filename, silent } = {
+    ...engraveDefaultOptions,
+    ...options,
+  };
 
   const builtAt = Date.now().toString();
   const iso = new Date(parseInt(builtAt, 10)).toISOString();
-  const commitHash = execSync('git rev-parse HEAD || true').toString('utf8').trim();
-  const endianness = os.endianness() ?? '';
-  const arch = os.arch() ?? '';
-  const homedir = os.homedir() ?? '';
+  const commitHash = execSync("git rev-parse HEAD || true")
+    .toString("utf8")
+    .trim();
+  const endianness = os.endianness() ?? "";
+  const arch = os.arch() ?? "";
+  const homedir = os.homedir() ?? "";
   const totalmem = os.totalmem().toString();
-  const username = os.userInfo().username ?? '';
-  const shell = os.userInfo().shell ?? '';
-  const cpumodel = os.cpus()[0].model ?? '';
+  const username = os.userInfo().username ?? "";
+  const shell = os.userInfo().shell ?? "";
+  const cpumodel = os.cpus()[0].model ?? "";
   const ncpus = os.cpus().length.toString();
 
   const ngrvs: Ngrv = {
@@ -100,21 +107,23 @@ export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv =
     NGRV_NCPUS: ncpus,
   } as const;
 
-  Object.entries(ngrvs).forEach(([key, value]) => (process.env[key] = value));
+  for (const [key, value] of Object.entries(ngrvs)) {
+    process.env[key] = value;
+  }
 
   try {
-    if (typeof outputDirectory === 'string') {
+    if (typeof outputDirectory === "string") {
       const folderPath = join(process.cwd(), outputDirectory);
       mkdirSync(folderPath, { recursive: true });
       const ngrvPath = join(folderPath, filename);
       const data = Object.entries(ngrvs)
         .map(([key, value]) => `${key}="${value}"`)
-        .join('\n');
-      writeFileSync(ngrvPath, data, 'utf8');
+        .join("\n");
+      writeFileSync(ngrvPath, data, "utf8");
       if (!silent) {
         console.log(
           `%c[ngrv] Saved at ${ngrvPath}`,
-          'color: green; font-size: larger; font-weight: bold;'
+          "color: green; font-size: larger; font-weight: bold;",
         );
       }
     }
@@ -126,21 +135,24 @@ export const engrave = (options: EngraveOptions = engraveDefaultOptions): Ngrv =
 };
 
 export const readEngrave = (
-  options: ReadEngraveOptions = readEngraveDefaultOptions
+  options: ReadEngraveOptions = readEngraveDefaultOptions,
 ): Ngrv | undefined => {
-  const { directory, filename, silent } = { ...readEngraveDefaultOptions, ...options };
+  const { directory, filename, silent } = {
+    ...readEngraveDefaultOptions,
+    ...options,
+  };
 
   try {
     const folderPath = join(process.cwd(), directory);
     const ngrvPath = join(folderPath, filename);
-    const data = readFileSync(ngrvPath, 'utf8').trim();
+    const data = readFileSync(ngrvPath, "utf8").trim();
     const ngrvs = data
-      .split('\r\n')
-      .join('\n')
-      .split('\n')
+      .split("\r\n")
+      .join("\n")
+      .split("\n")
       .map<{ key: NgrvKey; value: string }>((line) => {
-        const [key, ...others] = line.split('=');
-        const value = others.join('=').slice(1, -1).trim();
+        const [key, ...others] = line.split("=");
+        const value = others.join("=").slice(1, -1).trim();
         return { key: key as NgrvKey, value };
       })
       .reduce<Ngrv>((acc, { key, value }) => {
@@ -148,12 +160,14 @@ export const readEngrave = (
         return acc;
       }, {} as Ngrv);
 
-    Object.entries(ngrvs).forEach(([key, value]) => (process.env[key] = value));
+    for (const [key, value] of Object.entries(ngrvs)) {
+      process.env[key] = value;
+    }
 
     if (!silent) {
       console.log(
         `[ngrv] Read from ${ngrvPath}`,
-        'color: green; font-size: larger; font-weight: bold;'
+        "color: green; font-size: larger; font-weight: bold;",
       );
     }
 

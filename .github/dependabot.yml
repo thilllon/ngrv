@@ -1,0 +1,27 @@
+version: 2
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Seoul
+    commit-message:
+      prefix: chore(deps)
+updates:
+  - package-ecosystem: npm
+    directory: /
+    # Keep runtime declarations aligned with the selected Node LTS major.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+    patterns: ['*']
+    multi-ecosystem-group: dependencies
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+  - package-ecosystem: github-actions
+    directory: /
+    patterns: ['*']
+    multi-ecosystem-group: dependencies

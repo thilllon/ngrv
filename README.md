@@ -1,5 +1,9 @@
 # ngrv 4
 
+[![npm version](https://img.shields.io/npm/v/ngrv)](https://www.npmjs.com/package/ngrv)
+[![npm downloads](https://img.shields.io/npm/dm/ngrv)](https://www.npmjs.com/package/ngrv)
+[![CI](https://github.com/thilllon/ngrv/actions/workflows/ci.yml/badge.svg)](https://github.com/thilllon/ngrv/actions/workflows/ci.yml)
+
 Capture build metadata with a CLI, package the file with your application, and load it through an
 OpenTelemetry Node.js ResourceDetector. Every instance of the same artifact gets the same build
 identity, without needing Git in production.
@@ -243,13 +247,19 @@ and the OTel detector do not mutate the environment.
 ## Development
 
 ```sh
+mise install
+mise run setup
 pnpm install --frozen-lockfile
 pnpm check
+pnpm test
 pnpm build
-pnpm exec jest --runInBand
-pnpm test:package
+pnpm test:packaging
 ```
 
 Tests include temporary Git repositories, built CLI subprocesses, actual OTel resource detection,
 and a real NodeSDK exporting spans from the packaged build artifact. The package smoke test installs
 the tarball into an isolated consumer and verifies CommonJS/ESM imports and declarations.
+
+Node.js 22 or later is required. CJS and ESM have separate entry points and matching declarations;
+use `ngrv` and `ngrv/otel` rather than depending on generated filenames under `dist/`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the issue, PR, and Changesets workflow.

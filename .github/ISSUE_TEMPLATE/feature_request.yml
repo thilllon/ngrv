@@ -1,0 +1,15 @@
+name: Feature request
+description: Propose a focused improvement
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Problem and proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance checklist
+    validations:
+      required: true

@@ -1,8 +1,8 @@
-import { execFileSync } from 'child_process';
-import { readFileSync } from 'fs';
-import { join, resolve } from 'path';
-import { BuildInfo, validateBuildInfo } from './build-info';
-import { NgrvError } from './errors';
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { BuildInfo, validateBuildInfo } from "./build-info";
+import { NgrvError } from "./errors";
 
 export interface CollectBuildInfoOptions {
   cwd?: string;
@@ -32,18 +32,20 @@ interface ProviderIdentity {
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const collectError = (message: string, cause?: unknown): NgrvError =>
-  new NgrvError('NGRV_COLLECTION_ERROR', message, cause);
+  new NgrvError("NGRV_COLLECTION_ERROR", message, cause);
 
 const readPackageIdentity = (cwd: string): PackageIdentity => {
-  const manifestFile = join(cwd, 'package.json');
+  const manifestFile = join(cwd, "package.json");
   let source: string;
   try {
-    source = readFileSync(manifestFile, 'utf8');
+    source = readFileSync(manifestFile, "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
     throw collectError(`Unable to read ${manifestFile}`, error);
   }
 
@@ -53,14 +55,20 @@ const readPackageIdentity = (cwd: string): PackageIdentity => {
   } catch (error) {
     throw collectError(`Unable to parse ${manifestFile}`, error);
   }
-  if (!isRecord(manifest)) throw collectError(`${manifestFile} must contain a JSON object`);
+  if (!isRecord(manifest)) {
+    throw collectError(`${manifestFile} must contain a JSON object`);
+  }
 
   const identity: PackageIdentity = {};
-  for (const key of ['name', 'version'] as const) {
+  for (const key of ["name", "version"] as const) {
     const value = manifest[key];
-    if (value === undefined) continue;
-    if (typeof value !== 'string' || value.length === 0) {
-      throw collectError(`${manifestFile} field ${key} must be a non-empty string`);
+    if (value === undefined) {
+      continue;
+    }
+    if (typeof value !== "string" || value.length === 0) {
+      throw collectError(
+        `${manifestFile} field ${key} must be a non-empty string`,
+      );
     }
     identity[key] = value;
   }
@@ -68,24 +76,28 @@ const readPackageIdentity = (cwd: string): PackageIdentity => {
 };
 
 const runGit = (cwd: string, args: string[]): string =>
-  execFileSync('git', args, {
+  execFileSync("git", args, {
     cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
   }).trim();
 
 const readHeadRevision = (cwd: string): string | undefined => {
   try {
-    return runGit(cwd, ['rev-parse', '--verify', '--quiet', 'HEAD']);
+    return runGit(cwd, ["rev-parse", "--verify", "--quiet", "HEAD"]);
   } catch (error) {
-    if ((error as { status?: unknown }).status === 1) return undefined;
+    if ((error as { status?: unknown }).status === 1) {
+      return undefined;
+    }
     throw error;
   }
 };
 
 const readGitIdentity = (cwd: string): GitIdentity => {
   try {
-    if (runGit(cwd, ['rev-parse', '--is-inside-work-tree']) !== 'true') return {};
+    if (runGit(cwd, ["rev-parse", "--is-inside-work-tree"]) !== "true") {
+      return {};
+    }
   } catch {
     return {};
   }
@@ -93,32 +105,40 @@ const readGitIdentity = (cwd: string): GitIdentity => {
   try {
     return {
       revision: readHeadRevision(cwd),
-      dirty: runGit(cwd, ['--no-optional-locks', 'status', '--porcelain']).length > 0,
+      dirty:
+        runGit(cwd, ["--no-optional-locks", "status", "--porcelain"]).length >
+        0,
     };
   } catch (error) {
-    throw collectError('Unable to inspect the Git checkout', error);
+    throw collectError("Unable to inspect the Git checkout", error);
   }
 };
 
 const readProviderIdentity = (
-  env: Readonly<Record<string, string | undefined>>
+  env: Readonly<Record<string, string | undefined>>,
 ): ProviderIdentity => {
-  if (env.GITHUB_ACTIONS === 'true') {
+  if (env.GITHUB_ACTIONS === "true") {
     const server = env.GITHUB_SERVER_URL;
     const repository = env.GITHUB_REPOSITORY;
     const runId = env.GITHUB_RUN_ID;
     return {
       ...(env.GITHUB_SHA === undefined ? {} : { revision: env.GITHUB_SHA }),
       ...(server && repository && runId
-        ? { buildUrl: `${server.replace(/\/$/, '')}/${repository}/actions/runs/${runId}` }
+        ? {
+            buildUrl: `${server.replace(/\/$/, "")}/${repository}/actions/runs/${runId}`,
+          }
         : {}),
     };
   }
 
-  if (env.GITLAB_CI === 'true') {
+  if (env.GITLAB_CI === "true") {
     return {
-      ...(env.CI_COMMIT_SHA === undefined ? {} : { revision: env.CI_COMMIT_SHA }),
-      ...(env.CI_PIPELINE_URL === undefined ? {} : { buildUrl: env.CI_PIPELINE_URL }),
+      ...(env.CI_COMMIT_SHA === undefined
+        ? {}
+        : { revision: env.CI_COMMIT_SHA }),
+      ...(env.CI_PIPELINE_URL === undefined
+        ? {}
+        : { buildUrl: env.CI_PIPELINE_URL }),
     };
   }
 
@@ -126,19 +146,23 @@ const readProviderIdentity = (
 };
 
 const timestampFromEpoch = (value: string): string => {
-  if (!/^\d+$/.test(value)) throw collectError('SOURCE_DATE_EPOCH must be UTC Unix seconds');
+  if (!/^\d+$/.test(value)) {
+    throw collectError("SOURCE_DATE_EPOCH must be UTC Unix seconds");
+  }
   const seconds = Number(value);
   if (!Number.isSafeInteger(seconds)) {
-    throw collectError('SOURCE_DATE_EPOCH must be UTC Unix seconds');
+    throw collectError("SOURCE_DATE_EPOCH must be UTC Unix seconds");
   }
   const date = new Date(seconds * 1000);
   if (!Number.isFinite(date.getTime())) {
-    throw collectError('SOURCE_DATE_EPOCH must be UTC Unix seconds');
+    throw collectError("SOURCE_DATE_EPOCH must be UTC Unix seconds");
   }
   return date.toISOString();
 };
 
-export const collectBuildInfo = (options: CollectBuildInfoOptions = {}): BuildInfo => {
+export const collectBuildInfo = (
+  options: CollectBuildInfoOptions = {},
+): BuildInfo => {
   try {
     const cwd = resolve(options.cwd ?? process.cwd());
     const env = options.env ?? process.env;
@@ -147,23 +171,24 @@ export const collectBuildInfo = (options: CollectBuildInfoOptions = {}): BuildIn
     const providerIdentity = readProviderIdentity(env);
     const name = options.name ?? packageIdentity.name;
     const version = options.version ?? packageIdentity.version;
-    const revision = options.revision ?? gitIdentity.revision ?? providerIdentity.revision;
+    const revision =
+      options.revision ?? gitIdentity.revision ?? providerIdentity.revision;
     const dirty = options.dirty ?? gitIdentity.dirty;
     const buildUrl = options.buildUrl ?? providerIdentity.buildUrl;
 
-    const build: BuildInfo['build'] = {
+    const build: BuildInfo["build"] = {
       ...(buildUrl === undefined ? {} : { url: buildUrl }),
     };
     if (options.timestamp !== false) {
-      if (typeof options.timestamp === 'string') {
+      if (typeof options.timestamp === "string") {
         build.timestamp = options.timestamp;
-        build.timestampSource = 'explicit';
+        build.timestampSource = "explicit";
       } else if (env.SOURCE_DATE_EPOCH !== undefined) {
         build.timestamp = timestampFromEpoch(env.SOURCE_DATE_EPOCH);
-        build.timestampSource = 'source-date-epoch';
+        build.timestampSource = "source-date-epoch";
       } else {
         build.timestamp = new Date().toISOString();
-        build.timestampSource = 'clock';
+        build.timestampSource = "clock";
       }
     }
 
@@ -180,12 +205,19 @@ export const collectBuildInfo = (options: CollectBuildInfoOptions = {}): BuildIn
       build,
     });
 
-    if (options.strict && (!info.service.name || !info.service.version || !info.source.revision)) {
-      throw collectError('Strict mode requires service name, service version, and source revision');
+    if (
+      options.strict &&
+      (!info.service.name || !info.service.version || !info.source.revision)
+    ) {
+      throw collectError(
+        "Strict mode requires service name, service version, and source revision",
+      );
     }
     return info;
   } catch (error) {
-    if (error instanceof NgrvError && error.code === 'NGRV_COLLECTION_ERROR') throw error;
-    throw collectError('Unable to collect build metadata', error);
+    if (error instanceof NgrvError && error.code === "NGRV_COLLECTION_ERROR") {
+      throw error;
+    }
+    throw collectError("Unable to collect build metadata", error);
   }
 };

@@ -1,0 +1,8 @@
+packages:
+  - .
+  - example
+allowBuilds:
+  esbuild: true
+  protobufjs: false
+autoInstallPeers: true
+verifyDepsBeforeRun: false
