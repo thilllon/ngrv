@@ -50,7 +50,7 @@ expect(
     service: { name: 'fixture', version: '1.2.3' },
     source: { revision: 'a'.repeat(40), dirty: false },
     build: {},
-  })
+  }),
 ).toEqual({
   'service.name': 'fixture',
   'service.version': '1.2.3',
@@ -88,7 +88,7 @@ const generated = spawnSync(
     '--no-timestamp',
     '--strict',
   ],
-  { encoding: 'utf8' }
+  { encoding: 'utf8' },
 );
 expect(generated.status).toBe(0);
 const inspected = spawnSync(process.execPath, [cli, 'inspect', artifact, '--otel'], {

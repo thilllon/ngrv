@@ -1,8 +1,21 @@
 name: CI
+run-name: ${{ inputs.run_key || github.event.pull_request.title || github.event.head_commit.message || 'CI' }}
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact commit required by the release workflow
+        type: string
+        required: true
+      run_key:
+        description: Unique release validation identifier
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -11,38 +24,48 @@ jobs:
   test:
     name: Node.js ${{ matrix.node-version }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22, 24]
-
+        node-version: ['22.22.0', '24.21.0']
+    env:
+      LEFTHOOK: '0'
+      MISE_NODE_VERSION: ${{ matrix.node-version }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Verify dispatched commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: test "$GITHUB_SHA" = "$EXPECTED_SHA"
+      - uses: actions/checkout@v7
         with:
-          version: 8.15.9
-          run_install: false
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+      - run: node --version && pnpm --version
+      - run: pnpm install --frozen-lockfile
+      - name: Validate Conventional Commit PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:packaging
+      - run: pnpm --dir example test
+      - name: Scan tracked changes for secrets
+        run: gitleaks git --redact --no-banner --log-opts='-1' .
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: Run static checks
-        run: pnpm check
-
-      - name: Build package
-        run: pnpm build
-
-      - name: Run tests
-        run: pnpm exec jest --runInBand
-
-      - name: Test packed package
-        run: pnpm test:package
+  validate:
+    name: Validate
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every runtime check to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: test "$TEST_RESULT" = success

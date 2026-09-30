@@ -1,0 +1,16 @@
+[tools]
+node = "lts"
+pnpm = "12.4.2"
+lefthook = "2.1.14"
+gitleaks = "8.30.1"
+
+[hooks]
+postinstall = "lefthook install"
+
+[tasks.setup]
+description = "Install dependencies and Git hooks"
+run = ["pnpm install", "lefthook install"]
+
+[tasks.check]
+description = "Run nonmutating checks and package validation"
+run = ["pnpm lint", "pnpm format:check", "pnpm typecheck", "pnpm test", "pnpm build", "pnpm test:packaging"]

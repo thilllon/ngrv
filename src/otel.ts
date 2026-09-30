@@ -1,2 +1,2 @@
-export * from './otel-attributes';
-export * from './otel-detector';
+export * from "./otel-attributes";
+export * from "./otel-detector";
