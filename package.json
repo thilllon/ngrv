@@ -9,7 +9,8 @@
   ],
   "license": "MIT",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "packageManager": "pnpm@12.4.2",
   "author": "thilllon <thilllon970@gmail.com>",
@@ -61,7 +62,9 @@
     "check": "pnpm lint && pnpm format:check && pnpm typecheck",
     "test": "vitest run",
     "test:packaging": "vitest run --config vitest.packaging.config.mts && tsx scripts/package-smoke.mts",
-    "test:example": "pnpm build && pnpm --dir example test"
+    "test:example": "pnpm build && pnpm --dir example test",
+    "changeset": "changeset",
+    "release:publish": "changeset publish"
   },
   "engines": {
     "node": ">=22",
@@ -73,6 +76,7 @@
   "devDependencies": {
     "@arethetypeswrong/core": "0.18.5",
     "@biomejs/biome": "2.5.14",
+    "@changesets/cli": "3.0.3",
     "@commitlint/cli": "21.2.2",
     "@commitlint/config-conventional": "21.2.2",
     "@commitlint/types": "^21.2.0",

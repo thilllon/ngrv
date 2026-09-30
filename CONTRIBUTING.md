@@ -36,5 +36,6 @@ tests, and repository-only tooling do not require their own release.
 Merge checked squash PRs into `main`. The release workflow prepares version updates,
 validates and merges them, and publishes the resulting immutable revision through npm
 trusted publishing. Do not manually bump package versions or publish an unmerged tree.
+See [release automation](docs/releases.md) for owner setup, validation and retries.
 
 Do not add Co-Authored-By trailers. See [AGENTS.md](AGENTS.md) for repository rules.
