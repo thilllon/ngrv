@@ -1,0 +1,228 @@
+# The ngrv npm trusted publisher is registered with this workflow
+# filename. Never rename or move this file. Publication runs here or in a
+# reusable workflow called from here; npm checks the calling workflow file.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      changed: ${{ steps.prepare.outputs.changed }}
+      sha: ${{ steps.pr.outputs.sha }}
+      pr: ${{ steps.pr.outputs.pr }}
+      base: ${{ steps.base.outputs.sha }}
+      tree: ${{ steps.pr.outputs.tree || steps.base.outputs.tree }}
+    env:
+      LEFTHOOK: '0'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - id: base
+        env:
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EVENT_SHA"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - uses: jdx/mise-action@v4
+      - run: pnpm install --frozen-lockfile
+      - id: prepare
+        run: |
+          if [ -n "$(find .changeset -maxdepth 1 -name '*.md' ! -name README.md -print -quit)" ]; then
+            pnpm exec changeset version
+            pnpm install --lockfile-only --ignore-scripts
+            pnpm format
+          fi
+          git add .changeset package.json CHANGELOG.md pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create or refresh release PR
+        id: pr
+        if: steps.prepare.outputs.changed == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch --force-create automation/releases
+          git commit --message 'chore(release): version ngrv'
+          git push --force-with-lease origin automation/releases
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          pr=$(gh pr list --head automation/releases --base main --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            gh pr create --head automation/releases --base main --title 'chore(release): version ngrv' --body 'Automated Changesets version updates. The release workflow runs full CI against this exact commit before merging. npm publishing remains disabled until NPM_PUBLISH_ENABLED=true.'
+            pr=$(gh pr list --head automation/releases --base main --state open --json number --jq '.[0].number')
+          fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      actions: write
+      checks: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VALIDATED_SHA: ${{ needs.prepare.outputs.sha || needs.prepare.outputs.base }}
+      VALIDATED_REF: ${{ needs.prepare.outputs.changed == 'true' && 'automation/releases' || 'main' }}
+      RUN_KEY: release-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Dispatch CI on the exact release head
+        id: ci
+        run: |
+          workflow_id=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml" --jq .id)
+          gh workflow run ci.yml --ref "$VALIDATED_REF" --raw-field expected_sha="$VALIDATED_SHA" --raw-field run_key="$RUN_KEY"
+          for _attempt in {1..60}; do
+            run=$(gh run list --workflow ci.yml --event workflow_dispatch --branch "$VALIDATED_REF" --commit "$VALIDATED_SHA" --limit 100 --json databaseId,displayTitle --jq ".[] | select(.displayTitle == \"$RUN_KEY\") | .databaseId" | head -n 1)
+            if [ -n "$run" ]; then
+              gh run watch "$run" --exit-status --interval 10
+              result=$(gh api "repos/$GH_REPO/actions/runs/$run")
+              jq --exit-status --arg repo "$GH_REPO" --argjson workflow "$workflow_id" --arg sha "$VALIDATED_SHA" --arg key "$RUN_KEY" '
+                .repository.full_name == $repo and .workflow_id == $workflow and
+                .head_sha == $sha and .display_title == $key and
+                .event == "workflow_dispatch" and .status == "completed" and .conclusion == "success"
+              ' <<< "$result"
+              test "$(gh api "repos/$GH_REPO/actions/runs/$run/jobs" --jq 'any(.jobs[]; .name == "Validate" and .conclusion == "success")')" = true
+              echo "url=$(jq --raw-output .html_url <<< "$result")" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'The dispatched CI run was not found for the expected commit.' >&2
+          exit 1
+
+      - name: Report the verified CI result on the release head
+        if: needs.prepare.outputs.changed == 'true'
+        env:
+          CI_RUN_URL: ${{ steps.ci.outputs.url }}
+        run: |
+          gh api --method POST "repos/$GH_REPO/check-runs" \
+            --raw-field name=Validate --raw-field head_sha="$VALIDATED_SHA" \
+            --raw-field status=completed --raw-field conclusion=success \
+            --raw-field details_url="$CI_RUN_URL" --raw-field external_id="$RUN_KEY" \
+            --raw-field 'output[title]=Full CI passed on the exact release commit' \
+            --raw-field "output[summary]=Full CI succeeded for $VALIDATED_SHA. [View the complete CI run]($CI_RUN_URL). This report follows verified repository, workflow, commit and job results." \
+            --jq '{id, head_sha, conclusion, html_url}'
+
+  merge:
+    needs: [prepare, validate]
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_PR: ${{ needs.prepare.outputs.pr }}
+      RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
+      BASE_SHA: ${{ needs.prepare.outputs.base }}
+      VALIDATED_TREE: ${{ needs.prepare.outputs.tree }}
+    steps:
+      - name: Merge only the validated commit on its validated base
+        run: |
+          current=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')
+          test "$current" = "$BASE_SHA" || { echo 'main changed during validation; the next release run will refresh the PR.'; exit 1; }
+          gh pr merge "$RELEASE_PR" --squash --match-head-commit "$RELEASE_SHA" --delete-branch --body ''
+          merged=$(gh pr view "$RELEASE_PR" --json mergeCommit --jq .mergeCommit.oid)
+          test -n "$merged" && test "$merged" != null
+          test "$(gh api "repos/$GH_REPO/git/commits/$merged" --jq .tree.sha)" = "$VALIDATED_TREE"
+      - name: Start publication from the new main event commit
+        if: vars.NPM_PUBLISH_ENABLED == 'true'
+        run: gh workflow run release.yml --ref main
+
+  cleanup:
+    needs: [prepare, merge]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
+    steps:
+      # A PR that GITHUB_TOKEN opens or updates gets pull_request runs that wait for approval.
+      # The dispatched CI run validates the release head instead, and GitHub concludes the
+      # unapproved run as a failure without jobs when the version PR merges. Deleting the run
+      # deletes its check suite; an empty suite cannot hold the Checks API Validate report.
+      - name: Delete the unapproved pull_request CI run of the merged release head
+        run: |
+          runs=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?event=pull_request&head_sha=$RELEASE_SHA" --jq '
+            .workflow_runs[]
+            | select(.head_branch == "automation/releases" and .actor.login == "github-actions[bot]")
+            | select(.status == "completed" and (.conclusion == "action_required" or .conclusion == "failure"))
+            | "\(.id) \(.check_suite_id)"')
+          while read -r run suite; do
+            test -n "$run" || continue
+            test "$(gh api "repos/$GH_REPO/actions/runs/$run/jobs" --jq .total_count)" = 0 || continue
+            test "$(gh api "repos/$GH_REPO/check-suites/$suite" --jq .latest_check_runs_count)" = 0 || continue
+            gh api --method DELETE "repos/$GH_REPO/actions/runs/$run"
+            echo "Deleted unapproved pull_request run $run and its empty check suite $suite."
+          done <<< "$runs"
+
+  publish:
+    needs: [prepare, validate, merge]
+    if: >-
+      always() && vars.NPM_PUBLISH_ENABLED == 'true' &&
+      needs.prepare.result == 'success' && needs.validate.result == 'success' &&
+      needs.prepare.outputs.changed == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      LEFTHOOK: '0'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Verify publication matches the validated event commit
+        env:
+          EVENT_SHA: ${{ github.sha }}
+          VALIDATED_BASE: ${{ needs.prepare.outputs.base }}
+          VALIDATED_TREE: ${{ needs.prepare.outputs.tree }}
+        run: |
+          test "$VALIDATED_BASE" = "$EVENT_SHA"
+          test "$(git rev-parse HEAD)" = "$EVENT_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$VALIDATED_TREE"
+      - uses: jdx/mise-action@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:packaging
+      - name: Configure release tag identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - run: pnpm release:publish
+      - name: Recover any missing release tags after successful publication
+        run: pnpm exec changeset git-tag
+      - name: Push release tags without changing branches
+        run: git push origin --tags
