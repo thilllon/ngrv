@@ -11,6 +11,7 @@ const sdk = new NodeSDK({
   resourceDetectors: [
     birthplaceDetector({
       file: new URL("../birthplace.json", import.meta.url),
+      includeHostAttributes: true,
     }),
     processDetector,
     hostDetector,

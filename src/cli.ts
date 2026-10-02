@@ -43,6 +43,10 @@ program
     "--strict",
     "require service name, service version, and source revision",
   )
+  .option(
+    "--host",
+    "record the build machine: architecture, CPU, memory, and endianness",
+  )
   .action((options) => {
     try {
       const collectOptions: CollectBirthplaceOptions = {
@@ -63,6 +67,7 @@ program
           ? {}
           : { timestamp: options.timestamp }),
         ...(options.strict === undefined ? {} : { strict: options.strict }),
+        ...(options.host === undefined ? {} : { host: options.host }),
       };
       const info = collectBirthplace(collectOptions);
       const file = writeBirthplace(info, {
@@ -83,16 +88,25 @@ program
     "--include-custom-attributes",
     "include custom build attributes with --otel",
   )
+  .option(
+    "--include-host-attributes",
+    "include build machine attributes with --otel",
+  )
   .action(
     (
       file: string | undefined,
-      options: { otel?: boolean; includeCustomAttributes?: boolean },
+      options: {
+        otel?: boolean;
+        includeCustomAttributes?: boolean;
+        includeHostAttributes?: boolean;
+      },
     ) => {
       try {
         const info = readBirthplace(file);
         const output = options.otel
           ? toOtelAttributes(info, {
               includeCustomAttributes: options.includeCustomAttributes,
+              includeHostAttributes: options.includeHostAttributes,
             })
           : info;
         console.log(JSON.stringify(output, null, 2));

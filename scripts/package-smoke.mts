@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
@@ -48,6 +48,36 @@ const run = (
     );
   }
   return result.stdout;
+};
+
+// Walks the relative import graph of a built entry point and returns every bare
+// (non-relative) module it can load. ESM has no synchronous load hook to patch, so
+// this proves statically what the Module._load guard proves at runtime for CommonJS.
+const collectExternalModules = (entry: string): string[] => {
+  const externals = new Set<string>();
+  const visited = new Set<string>();
+  const pending = [entry];
+  while (pending.length > 0) {
+    const file = pending.pop() as string;
+    if (visited.has(file)) {
+      continue;
+    }
+    visited.add(file);
+    const source = readFileSync(file, "utf8");
+    const specifiers = [
+      ...source.matchAll(/\bfrom\s*["']([^"']+)["']/g),
+      ...source.matchAll(/\bimport\s*["']([^"']+)["']/g),
+      ...source.matchAll(/\b(?:require|import)\s*\(\s*["']([^"']+)["']\s*\)/g),
+    ].map((match) => match[1]);
+    for (const specifier of specifiers) {
+      if (specifier.startsWith(".")) {
+        pending.push(resolve(dirname(file), specifier));
+      } else {
+        externals.add(specifier.replace(/^node:/, ""));
+      }
+    }
+  }
+  return [...externals].sort();
 };
 
 try {
@@ -107,6 +137,7 @@ assert.equal(typeof otel.birthplaceDetector, 'function');
 Module._load = originalLoad;
 const root = require('birthplace');
 assert.equal(typeof root.collectBirthplace, 'function');
+assert.equal(root.collectHost, undefined);
 assert.equal(root.validateBirthplace, undefined);
 assert.equal(otel.validateBirthplace, undefined);
 assert.equal(root.engrave, undefined);
@@ -122,6 +153,7 @@ import { collectBirthplace } from 'birthplace';
 import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';
 assert.equal(typeof collectBirthplace, 'function');
 assert.equal('validateBirthplace' in root, false);
+assert.equal('collectHost' in root, false);
 assert.equal('engrave' in root, false);
 assert.equal('readEngrave' in root, false);
 assert.equal(typeof birthplaceDetector, 'function');
@@ -147,6 +179,27 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
     run(process.execPath, [join(installedPackageDirectory, target), "--help"]);
   }
 
+  // The OTel subpath must load neither the Git collector (child_process) nor the
+  // build-machine collector (os), in either module format. The root entry point is
+  // walked too so a broken walker cannot pass by finding nothing.
+  for (const extension of ["cjs", "mjs"]) {
+    const otelModules = collectExternalModules(
+      join(installedPackageDirectory, "dist", `otel.${extension}`),
+    );
+    assert.ok(otelModules.includes("fs"), `otel.${extension} graph was walked`);
+    assert.ok(
+      !otelModules.includes("child_process") && !otelModules.includes("os"),
+      `otel.${extension} must not load child_process or os: ${otelModules.join(", ")}`,
+    );
+    const rootModules = collectExternalModules(
+      join(installedPackageDirectory, "dist", `index.${extension}`),
+    );
+    assert.ok(
+      rootModules.includes("child_process") && rootModules.includes("os"),
+      `index.${extension} loads the collectors: ${rootModules.join(", ")}`,
+    );
+  }
+
   const birthplaceFile = join(consumerDirectory, "birthplace.json");
   run(join(binDirectory, `birthplace${executableSuffix}`), [
     "generate",
@@ -169,6 +222,39 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
   assert.equal(inspected["service.name"], "birthplace-smoke-consumer");
   assert.equal(inspected["service.version"], "1.0.0");
   assert.equal(inspected["vcs.ref.head.revision"], "c".repeat(40));
+  assert.equal(
+    "host" in JSON.parse(readFileSync(birthplaceFile, "utf8")),
+    false,
+  );
+
+  const hostFile = join(consumerDirectory, "birthplace-host.json");
+  run(join(binDirectory, `birthplace${executableSuffix}`), [
+    "generate",
+    "--cwd",
+    consumerDirectory,
+    "--output",
+    hostFile,
+    "--revision",
+    "c".repeat(40),
+    "--no-timestamp",
+    "--host",
+  ]);
+  const capturedHost = JSON.parse(readFileSync(hostFile, "utf8")).host;
+  assert.equal(typeof capturedHost.arch, "string");
+  assert.ok(["little", "big"].includes(capturedHost.endianness));
+  const hostAttributes = JSON.parse(
+    run(join(binDirectory, `birthplace${executableSuffix}`), [
+      "inspect",
+      hostFile,
+      "--otel",
+      "--include-host-attributes",
+    ]),
+  );
+  assert.equal(hostAttributes["birthplace.host.arch"], capturedHost.arch);
+  assert.equal(
+    hostAttributes["birthplace.host.endianness"],
+    capturedHost.endianness,
+  );
 
   run(process.execPath, [
     "--import",
@@ -206,7 +292,7 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
 
   writeFileSync(
     join(consumerDirectory, "types.ts"),
-    `import { collectBirthplace, type Birthplace } from 'birthplace';\nimport { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nconst info: Birthplace = collectBirthplace({ timestamp: false });\ntoOtelAttributes(info);\nbirthplaceDetector({ file: new URL('file:///app/birthplace.json') }).detect();\n`,
+    `import { collectBirthplace, type Birthplace, type BirthplaceHost } from 'birthplace';\nimport { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nconst info: Birthplace = collectBirthplace({ timestamp: false, host: true });\nconst host: BirthplaceHost | undefined = info.host;\nconst count: number | undefined = host?.cpu?.logical?.count;\nconst value: string | number | boolean = toOtelAttributes(info, { includeHostAttributes: true })['birthplace.host.memory.total'];\nbirthplaceDetector({ file: new URL('file:///app/birthplace.json'), includeHostAttributes: true }).detect();\nexport { count, value };\n`,
   );
   writeFileSync(
     join(consumerDirectory, "types.mts"),

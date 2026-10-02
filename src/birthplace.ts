@@ -17,6 +17,25 @@ export interface Birthplace {
     timestampSource?: BuildTimestampSource;
     url?: string;
   };
+  /** The machine that ran the build. Present only when capture was requested. */
+  host?: BirthplaceHost;
+}
+
+export type HostEndianness = "little" | "big";
+
+/** Build-machine facts. Paths mirror OTel semantic-convention host.* naming. */
+export interface BirthplaceHost {
+  /** OTel semantic conventions host.arch value, such as amd64 or arm64. */
+  arch?: string;
+  cpu?: {
+    model?: { name?: string };
+    logical?: { count?: number };
+  };
+  memory?: {
+    /** Total physical memory in bytes. */
+    total?: number;
+  };
+  endianness?: HostEndianness;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -48,6 +67,83 @@ const optionalNonEmptyString = (
     return validationError(`${path} must be a non-empty string when present`);
   }
   return value;
+};
+
+const optionalNonNegativeInteger = (
+  object: Record<string, unknown>,
+  key: string,
+  path: string,
+): number | undefined => {
+  const value = object[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    return validationError(
+      `${path} must be a non-negative integer when present`,
+    );
+  }
+  return value;
+};
+
+const optionalRecord = (
+  object: Record<string, unknown>,
+  key: string,
+  path: string,
+): Record<string, unknown> => {
+  const value = object[key];
+  if (value === undefined) {
+    return {};
+  }
+  assertRecord(value, path);
+  return value;
+};
+
+const validateHost = (value: unknown): BirthplaceHost => {
+  assertRecord(value, "host");
+  const cpu = optionalRecord(value, "cpu", "host.cpu");
+  const arch = optionalNonEmptyString(value, "arch", "host.arch");
+  const modelName = optionalNonEmptyString(
+    optionalRecord(cpu, "model", "host.cpu.model"),
+    "name",
+    "host.cpu.model.name",
+  );
+  const logicalCount = optionalNonNegativeInteger(
+    optionalRecord(cpu, "logical", "host.cpu.logical"),
+    "count",
+    "host.cpu.logical.count",
+  );
+  const memoryTotal = optionalNonNegativeInteger(
+    optionalRecord(value, "memory", "host.memory"),
+    "total",
+    "host.memory.total",
+  );
+  const endianness = value.endianness;
+  if (
+    endianness !== undefined &&
+    endianness !== "little" &&
+    endianness !== "big"
+  ) {
+    validationError('host.endianness must be "little" or "big" when present');
+  }
+
+  return {
+    ...(arch === undefined ? {} : { arch }),
+    ...(modelName === undefined && logicalCount === undefined
+      ? {}
+      : {
+          cpu: {
+            ...(modelName === undefined ? {} : { model: { name: modelName } }),
+            ...(logicalCount === undefined
+              ? {}
+              : { logical: { count: logicalCount } }),
+          },
+        }),
+    ...(memoryTotal === undefined ? {} : { memory: { total: memoryTotal } }),
+    ...(endianness === undefined
+      ? {}
+      : { endianness: endianness as HostEndianness }),
+  };
 };
 
 const normalizeIsoTimestamp = (value: string): string => {
@@ -173,6 +269,7 @@ export const validateBirthplace = (value: unknown): Birthplace => {
   if (url !== undefined) {
     validateUrl(url);
   }
+  const host = value.host === undefined ? undefined : validateHost(value.host);
 
   return {
     schemaVersion: 1,
@@ -193,5 +290,6 @@ export const validateBirthplace = (value: unknown): Birthplace => {
         : { timestampSource: timestampSource as BuildTimestampSource }),
       ...(url === undefined ? {} : { url }),
     },
+    ...(host === undefined ? {} : { host }),
   };
 };
