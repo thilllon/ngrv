@@ -45,6 +45,39 @@ The `birthplace` name is claimed and released in three steps, in this order:
    npm can only attach a trusted publisher to a package that already exists, and
    `package.json` stays at `0.0.0` until the first Changesets release. This is the
    only manual publish; it is done once from the owner's machine, never by automation.
+
+   Publish the placeholder from an empty scratch directory, not from this
+   repository. The repository manifest ships `dist` and declares `bin` and
+   `exports`, so publishing a built checkout would release the real code as
+   `0.0.0`, and an unbuilt one would release entry points that do not exist. The
+   placeholder contains a single `package.json` and no code:
+
+   ```sh
+   mkdir birthplace-placeholder && cd birthplace-placeholder
+   cat > package.json <<'EOF'
+   {
+     "name": "birthplace",
+     "version": "0.0.0",
+     "description": "Placeholder that reserves the name. Install 1.0.0 or later.",
+     "license": "MIT",
+     "repository": {
+       "type": "git",
+       "url": "git+https://github.com/thilllon/birthplace.git"
+     }
+   }
+   EOF
+   npm pack --dry-run
+   npm publish --access public --provenance=false
+   npm view birthplace version
+   ```
+
+   `npm pack --dry-run` must list `package.json` only. `--provenance=false` is
+   required for a manual publish: npm generates provenance only inside a supported
+   CI provider and fails elsewhere when provenance is enabled, as it is in this
+   repository's `publishConfig`. The placeholder therefore has no provenance;
+   `1.0.0` is the first version with it. npm never allows a published version
+   number to be reused, so `0.0.0` stays the placeholder permanently.
+
 2. The owner registers the npm trusted publisher for repository
    `thilllon/birthplace` and workflow `release.yml` using these settings:
 
