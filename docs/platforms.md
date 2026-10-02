@@ -20,25 +20,27 @@ Run exactly one `birthplace generate` call during the build, from the `build` sc
 `package.json`. Do not put it in GitHub or Vercel settings: the script travels with the repository
 and behaves the same on every machine that builds it.
 
-Chain it explicitly, and choose the position by how the application loads the file:
+Chain it explicitly, and choose the position by how the application loads the file.
 
-```jsonc
+When the application reads the file with `fs` at runtime, generate **after** compiling, because a
+build that cleans `dist` would delete a file generated earlier:
+
+```json
 {
   "scripts": {
-    // Read with fs at runtime: generate AFTER compiling, because a build that cleans dist would
-    // delete a file generated earlier.
-    "build": "tsc && birthplace generate --output dist/birthplace.json",
-  },
+    "build": "tsc && birthplace generate --output dist/birthplace.json"
+  }
 }
 ```
 
-```jsonc
+When the application imports the file, generate **before** the bundler, so the module exists when
+the bundler resolves the import:
+
+```json
 {
   "scripts": {
-    // Imported by the application: generate BEFORE the bundler, so the module exists when the
-    // bundler resolves the import.
-    "build": "birthplace generate --format esm --output src/birthplace.mjs && next build",
-  },
+    "build": "birthplace generate --format esm --output src/birthplace.mjs && next build"
+  }
 }
 ```
 
@@ -107,11 +109,11 @@ Files read with `fs` at runtime can be missing from a function bundle, and a mis
 attributes silently (see [OpenTelemetry SDK behavior](#opentelemetry-sdk-behavior)). Generate an ESM
 birthplace file before the bundler and import it:
 
-```jsonc
+```json
 {
   "scripts": {
-    "build": "birthplace generate --format esm --output src/birthplace.mjs && next build",
-  },
+    "build": "birthplace generate --format esm --output src/birthplace.mjs && next build"
+  }
 }
 ```
 
@@ -186,23 +188,25 @@ Pick one remedy:
 
 1. **Run generate as an uncached task after the build.** This fits a file that is read at runtime.
 
-   ```jsonc
-   // package.json
+   In `package.json`, split the build into two scripts:
+
+   ```json
    {
      "scripts": {
        "build": "tsc",
-       "build:metadata": "birthplace generate --output dist/birthplace.json",
-     },
+       "build:metadata": "birthplace generate --output dist/birthplace.json"
+     }
    }
    ```
 
-   ```jsonc
-   // turbo.json
+   In `turbo.json`, make the second task depend on the first and disable its cache:
+
+   ```json
    {
      "tasks": {
        "build": { "outputs": ["dist/**"] },
-       "build:metadata": { "dependsOn": ["build"], "cache": false },
-     },
+       "build:metadata": { "dependsOn": ["build"], "cache": false }
+     }
    }
    ```
 
