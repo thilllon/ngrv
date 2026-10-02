@@ -3,6 +3,7 @@ node = "lts"
 pnpm = "12.4.2"
 lefthook = "2.1.14"
 gitleaks = "8.30.1"
+trufflehog = "3.97.9"
 
 [hooks]
 postinstall = "lefthook install"

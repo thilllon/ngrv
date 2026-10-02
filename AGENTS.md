@@ -15,6 +15,10 @@ Keep this file current with maintainer decisions. `CLAUDE.md` imports it.
 
 - Use mise with the Node.js LTS and the pinned stable pnpm version.
 - Use Lefthook for Git hooks. Keep checks nonmutating and installations explicit.
+- Gitleaks scans staged changes before a commit; TruffleHog verifies unpushed commits
+  before a push. CI scans the whole pushed or pull-request range with both, and
+  `Validate` requires that job. Mark deliberate credential-shaped fixtures with
+  `trufflehog:ignore`; never weaken the scan to pass.
 - Use Biome for supported source/config files and Prettier for Markdown/YAML.
 - Build CJS and ESM with tsdown and matching declarations. Strict publint and attw
   checks belong in the build. Keep OpenTelemetry SDK dependencies development-only.

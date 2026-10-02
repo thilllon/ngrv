@@ -299,6 +299,194 @@ describe("collectBuildInfo", () => {
     ).toEqual({ schemaVersion: 1, service: {}, source: {}, build: {} });
   });
 
+  it("uses a Vercel revision and build logs URL only with the Vercel marker", () => {
+    const cwd = makeTemporaryDirectory();
+    const providerEnvironment = {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_SHA: "a".repeat(40),
+      VERCEL_URL: "fixture-abc123-team.vercel.app",
+    };
+
+    expect(
+      collectBuildInfo({ cwd, env: providerEnvironment, timestamp: false }),
+    ).toEqual({
+      schemaVersion: 1,
+      service: {},
+      source: { revision: "a".repeat(40) },
+      build: { url: "https://fixture-abc123-team.vercel.app/_logs" },
+    });
+    for (const marker of ["0", "true", undefined]) {
+      expect(
+        collectBuildInfo({
+          cwd,
+          env: { ...providerEnvironment, VERCEL: marker },
+          timestamp: false,
+        }),
+      ).toEqual({ schemaVersion: 1, service: {}, source: {}, build: {} });
+    }
+  });
+
+  it("keeps explicit options and the checkout ahead of Vercel values", () => {
+    const { cwd, initialCommit } = makeRepository();
+    const env = {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_SHA: "b".repeat(40),
+      VERCEL_URL: "fixture.vercel.app",
+    };
+
+    expect(
+      collectBuildInfo({ cwd, env, timestamp: false }).source.revision,
+    ).toBe(initialCommit);
+    const explicit = collectBuildInfo({
+      cwd,
+      env,
+      revision: "c".repeat(40),
+      buildUrl: "https://ci.example.test/builds/42",
+      timestamp: false,
+    });
+    expect(explicit.source.revision).toBe("c".repeat(40));
+    expect(explicit.build.url).toBe("https://ci.example.test/builds/42");
+  });
+
+  it("prefers GitHub Actions and GitLab CI over Vercel when both markers are set", () => {
+    const cwd = makeTemporaryDirectory();
+    const vercelEnvironment = {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_SHA: "a".repeat(40),
+      VERCEL_URL: "fixture.vercel.app",
+    };
+
+    expect(
+      collectBuildInfo({
+        cwd,
+        env: {
+          ...vercelEnvironment,
+          GITHUB_ACTIONS: "true",
+          GITHUB_SHA: "e".repeat(40),
+          GITHUB_SERVER_URL: "https://github.example.test",
+          GITHUB_REPOSITORY: "owner/repository",
+          GITHUB_RUN_ID: "1234",
+        },
+        timestamp: false,
+      }),
+    ).toEqual({
+      schemaVersion: 1,
+      service: {},
+      source: { revision: "e".repeat(40) },
+      build: {
+        url: "https://github.example.test/owner/repository/actions/runs/1234",
+      },
+    });
+    // Providers are not merged: missing GitHub values are not filled from
+    // Vercel.
+    expect(
+      collectBuildInfo({
+        cwd,
+        env: { ...vercelEnvironment, GITHUB_ACTIONS: "true" },
+        timestamp: false,
+      }),
+    ).toEqual({ schemaVersion: 1, service: {}, source: {}, build: {} });
+    expect(
+      collectBuildInfo({
+        cwd,
+        env: {
+          ...vercelEnvironment,
+          GITLAB_CI: "true",
+          CI_COMMIT_SHA: "f".repeat(40),
+        },
+        timestamp: false,
+      }),
+    ).toEqual({
+      schemaVersion: 1,
+      service: {},
+      source: { revision: "f".repeat(40) },
+      build: {},
+    });
+  });
+
+  it("ignores empty Vercel values and a VERCEL_URL that is not a hostname", () => {
+    const cwd = makeTemporaryDirectory();
+
+    expect(
+      collectBuildInfo({
+        cwd,
+        env: { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "", VERCEL_URL: "" },
+        timestamp: false,
+      }),
+    ).toEqual({ schemaVersion: 1, service: {}, source: {}, build: {} });
+    for (const host of [
+      "https://fixture.vercel.app",
+      "fixture.vercel.app/path",
+      "fixture.vercel.app:8443",
+      "user:secret@fixture.vercel.app",
+      "fixture .vercel.app",
+      "fixture..vercel.app",
+      "-fixture.vercel.app",
+      "fixture.vercel.app?query",
+      "fixture.vercel.app#fragment",
+      "fixture.vercel.app\n",
+    ]) {
+      expect(
+        collectBuildInfo({
+          cwd,
+          env: {
+            VERCEL: "1",
+            VERCEL_GIT_COMMIT_SHA: "a".repeat(40),
+            VERCEL_URL: host,
+          },
+          timestamp: false,
+        }),
+      ).toEqual({
+        schemaVersion: 1,
+        service: {},
+        source: { revision: "a".repeat(40) },
+        build: {},
+      });
+    }
+  });
+
+  it("rejects a malformed Vercel revision like other provider revisions", () => {
+    const cwd = makeTemporaryDirectory();
+
+    for (const env of [
+      { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "not-a-sha" },
+      { GITHUB_ACTIONS: "true", GITHUB_SHA: "not-a-sha" },
+    ]) {
+      expectNgrvError(
+        () => collectBuildInfo({ cwd, env, timestamp: false }),
+        "NGRV_COLLECTION_ERROR",
+      );
+    }
+  });
+
+  it("fails strict collection on Vercel only when the revision is unavailable", () => {
+    const cwd = makeTemporaryDirectory();
+    writeFileSync(
+      join(cwd, "package.json"),
+      '{"name":"fixture","version":"1.2.3"}',
+      "utf8",
+    );
+
+    expect(
+      collectBuildInfo({
+        cwd,
+        env: { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "a".repeat(40) },
+        strict: true,
+        timestamp: false,
+      }).source,
+    ).toEqual({ revision: "a".repeat(40) });
+    expectNgrvError(
+      () =>
+        collectBuildInfo({
+          cwd,
+          env: { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "" },
+          strict: true,
+          timestamp: false,
+        }),
+      "NGRV_COLLECTION_ERROR",
+    );
+  });
+
   it("uses source date epoch zero as a reproducible UTC timestamp", () => {
     const cwd = makeTemporaryDirectory();
 
@@ -480,6 +668,7 @@ describe("BuildInfo validation and storage", () => {
       "credentialed URL",
       {
         ...completeInfo,
+        // trufflehog:ignore
         build: { url: "https://user:password@example.test/build" },
       },
     ],
