@@ -97,8 +97,8 @@ The `birthplace` name is claimed and released in three steps, in this order:
    npm trust list birthplace
    ```
 
-3. `release.yml` publishes `1.0.0`. The single major Changeset of the rename
-   workstream moves the version from `0.0.0` to exactly `1.0.0`, Changesets creates
+3. `release.yml` publishes `1.0.0`. The single major Changeset of the first
+   release moves the version from `0.0.0` to exactly `1.0.0`, Changesets creates
    `CHANGELOG.md` with that one entry, and the workflow publishes it through OIDC
    with provenance. No `CHANGELOG.md` exists in the repository before that release.
 
