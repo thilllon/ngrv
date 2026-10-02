@@ -24,6 +24,7 @@ import {
 } from "../src";
 import * as publicApi from "../src";
 import { validateBirthplace } from "../src/birthplace";
+import { collectHost, HostProvider, toSemconvArch } from "../src/host";
 import * as otelApi from "../src/otel";
 
 const temporaryDirectories: string[] = [];
@@ -609,7 +610,215 @@ describe("collectBirthplace", () => {
   });
 });
 
+const completeHost = {
+  arch: "arm64",
+  cpu: { model: { name: "Fixture CPU" }, logical: { count: 8 } },
+  memory: { total: 17_179_869_184 },
+  endianness: "little",
+} as const;
+
+const makeHostProvider = (
+  overrides: Partial<HostProvider> = {},
+): HostProvider => ({
+  arch: () => "arm64",
+  cpus: () => Array.from({ length: 8 }, () => ({ model: "Fixture CPU" })),
+  totalmem: () => 17_179_869_184,
+  endianness: () => "LE",
+  ...overrides,
+});
+
+describe("build machine capture", () => {
+  it("reads only hardware facts from the injected provider", () => {
+    expect(collectHost(makeHostProvider())).toEqual(completeHost);
+  });
+
+  it.each([
+    ["x64", "amd64"],
+    ["ia32", "x86"],
+    ["arm", "arm32"],
+    ["arm64", "arm64"],
+    ["ppc", "ppc32"],
+    ["ppc64", "ppc64"],
+    ["s390x", "s390x"],
+    ["riscv64", "riscv64"],
+    ["constructor", "constructor"],
+  ])("stores Node.js architecture %s as %s", (nodeArch, expected) => {
+    expect(toSemconvArch(nodeArch)).toBe(expected);
+    expect(collectHost(makeHostProvider({ arch: () => nodeArch })).arch).toBe(
+      expected,
+    );
+  });
+
+  it("stores big-endian machines as big", () => {
+    expect(
+      collectHost(makeHostProvider({ endianness: () => "BE" })).endianness,
+    ).toBe("big");
+  });
+
+  it("omits CPU fields when the platform reports no CPUs", () => {
+    const host = collectHost(makeHostProvider({ cpus: () => [] }));
+
+    expect(host).toEqual({
+      arch: "arm64",
+      memory: { total: 17_179_869_184 },
+      endianness: "little",
+    });
+    expect(validateBirthplace({ ...completeInfo, host }).host).toEqual(host);
+  });
+
+  it("omits a blank CPU model name but keeps the logical count", () => {
+    expect(
+      collectHost(
+        makeHostProvider({ cpus: () => [{ model: "  " }, { model: "  " }] }),
+      ).cpu,
+    ).toEqual({ logical: { count: 2 } });
+  });
+
+  it("trims the CPU model name", () => {
+    expect(
+      collectHost(
+        makeHostProvider({ cpus: () => [{ model: " Fixture CPU " }] }),
+      ).cpu,
+    ).toEqual({ model: { name: "Fixture CPU" }, logical: { count: 1 } });
+  });
+
+  it.each([0, Number.NaN, 2 ** 60, 1.5])(
+    "omits an unusable total memory of %s",
+    (total) => {
+      expect(
+        collectHost(makeHostProvider({ totalmem: () => total })).memory,
+      ).toBeUndefined();
+    },
+  );
+
+  it("is omitted from collected metadata unless requested", () => {
+    const cwd = makeTemporaryDirectory();
+
+    expect(collectBirthplace({ cwd, env: {}, timestamp: false })).toEqual({
+      schemaVersion: 1,
+      service: {},
+      source: {},
+      build: {},
+    });
+    expect(
+      "host" in
+        collectBirthplace({ cwd, env: {}, timestamp: false, host: false }),
+    ).toBe(false);
+  });
+
+  it("captures the real build machine with the documented types", () => {
+    const cwd = makeTemporaryDirectory();
+
+    const info = collectBirthplace({
+      cwd,
+      env: {},
+      timestamp: false,
+      host: true,
+    });
+
+    const host = info.host as NonNullable<Birthplace["host"]>;
+    expect(Object.keys(host).sort()).toEqual(
+      expect.arrayContaining(["arch", "endianness"]),
+    );
+    expect(
+      Object.keys(host).every((key) =>
+        ["arch", "cpu", "memory", "endianness"].includes(key),
+      ),
+    ).toBe(true);
+    expect(typeof host.arch).toBe("string");
+    expect(["little", "big"]).toContain(host.endianness);
+    if (host.cpu?.model !== undefined) {
+      expect(typeof host.cpu.model.name).toBe("string");
+    }
+    if (host.cpu?.logical !== undefined) {
+      expect(Number.isSafeInteger(host.cpu.logical.count)).toBe(true);
+    }
+    if (host.memory !== undefined) {
+      expect(Number.isSafeInteger(host.memory.total)).toBe(true);
+    }
+    // The validator drops undocumented keys, so equality after a JSON round trip
+    // proves nothing else (user name, home directory, shell, host name) was captured.
+    expect(validateBirthplace(JSON.parse(JSON.stringify(info)))).toEqual(info);
+  });
+});
+
 describe("Birthplace validation and storage", () => {
+  it("accepts a complete, a partial, and an absent host group", () => {
+    expect(
+      validateBirthplace({ ...completeInfo, host: completeHost }).host,
+    ).toEqual(completeHost);
+    expect(
+      validateBirthplace({ ...completeInfo, host: { arch: "amd64" } }).host,
+    ).toEqual({ arch: "amd64" });
+    expect(
+      validateBirthplace({
+        ...completeInfo,
+        host: { cpu: { logical: { count: 0 } }, memory: { total: 0 } },
+      }).host,
+    ).toEqual({ cpu: { logical: { count: 0 } }, memory: { total: 0 } });
+    expect("host" in validateBirthplace(completeInfo)).toBe(false);
+  });
+
+  it("drops unknown host keys and empty host subgroups", () => {
+    expect(
+      validateBirthplace({
+        ...completeInfo,
+        host: {
+          ...completeHost,
+          name: "builder.internal",
+          username: "alice",
+          cpu: { ...completeHost.cpu, vendor: { id: "Fixture" } },
+          memory: {},
+        },
+      }).host,
+    ).toEqual({
+      arch: "arm64",
+      cpu: completeHost.cpu,
+      endianness: "little",
+    });
+    expect(
+      validateBirthplace({ ...completeInfo, host: { cpu: { model: {} } } })
+        .host,
+    ).toEqual({});
+  });
+
+  it.each([
+    ["non-object host", "arm64"],
+    ["array host", []],
+    ["null host", null],
+    ["empty arch", { arch: "" }],
+    ["numeric arch", { arch: 64 }],
+    ["non-object cpu", { cpu: "Fixture CPU" }],
+    ["non-object cpu.model", { cpu: { model: "Fixture CPU" } }],
+    ["empty cpu.model.name", { cpu: { model: { name: "" } } }],
+    ["non-object cpu.logical", { cpu: { logical: 8 } }],
+    ["string cpu.logical.count", { cpu: { logical: { count: "8" } } }],
+    ["negative cpu.logical.count", { cpu: { logical: { count: -1 } } }],
+    ["fractional cpu.logical.count", { cpu: { logical: { count: 1.5 } } }],
+    ["non-object memory", { memory: 1024 }],
+    ["negative memory.total", { memory: { total: -1 } }],
+    ["unsafe memory.total", { memory: { total: 2 ** 60 } }],
+    ["non-finite memory.total", { memory: { total: Number.NaN } }],
+    ["Node.js endianness", { endianness: "LE" }],
+    ["boolean endianness", { endianness: true }],
+  ])("rejects a malformed host group: %s", (_caseName, host) => {
+    expectBirthplaceError(
+      () => validateBirthplace({ ...completeInfo, host }),
+      "BIRTHPLACE_VALIDATION_ERROR",
+    );
+  });
+
+  it("round-trips the host group through a JSON birthplace file", () => {
+    const directory = makeTemporaryDirectory();
+    const info: Birthplace = { ...completeInfo, host: completeHost };
+    const file = join(directory, "metadata.json");
+
+    writeBirthplace(info, { file });
+
+    expect(readBirthplace(file)).toEqual(info);
+    expect(JSON.parse(readFileSync(file, "utf8")).host).toEqual(completeHost);
+  });
+
   it("accepts SHA-1 and SHA-256 revisions", () => {
     expect(
       validateBirthplace({
@@ -817,6 +1026,45 @@ describe("toOtelAttributes", () => {
     } as unknown as Birthplace;
 
     expect(toOtelAttributes(minimal)).toEqual({ "service.name": "fixture" });
+  });
+
+  it("exports host attributes only when separately requested", () => {
+    const info: Birthplace = { ...completeInfo, host: completeHost };
+    const standard = toOtelAttributes(completeInfo);
+
+    expect(toOtelAttributes(info)).toEqual(standard);
+    expect(toOtelAttributes(info, { includeCustomAttributes: true })).toEqual(
+      toOtelAttributes(completeInfo, { includeCustomAttributes: true }),
+    );
+    expect(toOtelAttributes(info, { includeHostAttributes: true })).toEqual({
+      ...standard,
+      "birthplace.host.arch": "arm64",
+      "birthplace.host.cpu.model.name": "Fixture CPU",
+      "birthplace.host.cpu.logical.count": 8,
+      "birthplace.host.memory.total": 17_179_869_184,
+      "birthplace.host.endianness": "little",
+    });
+  });
+
+  it("exports only the host fields that were captured", () => {
+    expect(
+      toOtelAttributes(
+        {
+          schemaVersion: 1,
+          service: {},
+          source: {},
+          build: {},
+          host: { arch: "amd64", cpu: { logical: { count: 0 } } },
+        },
+        { includeHostAttributes: true },
+      ),
+    ).toEqual({
+      "birthplace.host.arch": "amd64",
+      "birthplace.host.cpu.logical.count": 0,
+    });
+    expect(
+      toOtelAttributes(completeInfo, { includeHostAttributes: true }),
+    ).toEqual(toOtelAttributes(completeInfo));
   });
 
   it("validates metadata before converting it", () => {

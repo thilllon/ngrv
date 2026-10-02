@@ -87,8 +87,8 @@ as required by your instrumentation. See the OpenTelemetry documentation for
 [resources](https://opentelemetry.io/docs/languages/js/resources/) and
 [instrumentation initialization](https://opentelemetry.io/docs/languages/js/instrumentation/).
 
-`birthplaceDetector({ file?, includeCustomAttributes? })` accepts a JSON path or file URL. Relative
-paths are resolved when the detector is created; the default is `birthplace.json`. The file is read
+`birthplaceDetector({ file?, includeCustomAttributes?, includeHostAttributes? })` accepts a JSON path
+or file URL. Relative paths are resolved when the detector is created; the default is `birthplace.json`. The file is read
 and validated during `detect()`, not when the package is imported. The detector never invokes Git,
 reads package.json, regenerates metadata, or mutates `process.env`.
 
@@ -126,8 +126,8 @@ const sdk = new NodeSDK({
 sdk.start();
 ```
 
-`birthplaceDetector({ info, includeCustomAttributes? })` performs no file access. The object is
-validated during `detect()`, exactly like a file. Passing both `file` and `info` throws a
+`birthplaceDetector({ info, includeCustomAttributes?, includeHostAttributes? })` performs no file
+access. The object is validated during `detect()`, exactly like a file. Passing both `file` and `info` throws a
 `BirthplaceError` with code `BIRTHPLACE_VALIDATION_ERROR` when the detector is created, so that
 mistake is not swallowed by OpenTelemetry. The generated file is build output: add
 `src/birthplace.mjs` to `.gitignore`.
@@ -181,6 +181,7 @@ A JSON birthplace file has this shape; unavailable optional fields are omitted:
 - CI pipeline run URL: explicit `buildUrl`, then the recognized CI provider's run URL.
 - Timestamp: `timestamp: false` omits it; an explicit ISO timestamp wins over `SOURCE_DATE_EPOCH`;
   a valid `SOURCE_DATE_EPOCH` wins over the collection clock.
+- Build machine: recorded only with `host: true`; see [Build machine](#build-machine).
 
 Provider values are a fallback only, and exactly one provider is used. The first matching marker
 wins; values from different providers are never mixed:
@@ -248,6 +249,77 @@ const attributes = toOtelAttributes(birthplace);
 
 `readBirthplace` is for JSON birthplace files; it intentionally does not execute generated ESM files.
 
+## Build machine
+
+birthplace can also record the machine that ran the build. Capture is **off by default**: pass
+`--host` to `birthplace generate`, or `host: true` to `collectBirthplace`. The birthplace file then
+gains an optional top-level `host` group:
+
+```json
+{
+  "schemaVersion": 1,
+  "service": { "name": "checkout", "version": "2.0.0" },
+  "source": { "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "dirty": false },
+  "build": {},
+  "host": {
+    "arch": "arm64",
+    "cpu": { "model": { "name": "Apple M2" }, "logical": { "count": 8 } },
+    "memory": { "total": 17179869184 },
+    "endianness": "little"
+  }
+}
+```
+
+Exporting the group as resource attributes is a separate opt-in: pass `includeHostAttributes: true`
+to `birthplaceDetector` or `toOtelAttributes`, or `--include-host-attributes` to
+`birthplace inspect --otel`. Each attribute key is `birthplace.` followed by the JSON path:
+
+| JSON path                | Resource attribute                  | Type and unit             | Source                                 |
+| ------------------------ | ----------------------------------- | ------------------------- | -------------------------------------- |
+| `host.arch`              | `birthplace.host.arch`              | string                    | `os.arch()`, mapped as described below |
+| `host.cpu.model.name`    | `birthplace.host.cpu.model.name`    | string                    | `os.cpus()[0].model`, trimmed          |
+| `host.cpu.logical.count` | `birthplace.host.cpu.logical.count` | integer, logical CPUs     | `os.cpus().length`                     |
+| `host.memory.total`      | `birthplace.host.memory.total`      | integer, bytes            | `os.totalmem()`                        |
+| `host.endianness`        | `birthplace.host.endianness`        | string, `little` or `big` | `os.endianness()` (`LE` / `BE`)        |
+
+`host.arch` uses the OTel semantic conventions `host.arch` vocabulary rather than Node.js names:
+`x64` becomes `amd64`, `ia32` becomes `x86`, `arm` becomes `arm32`, `ppc` becomes `ppc32`, and
+`arm64`, `ppc64`, and `s390x` keep their names. An architecture without a semconv value, such as
+`riscv64`, is stored unchanged.
+
+A fact the platform cannot report is omitted instead of guessed: when `os.cpus()` is empty, both CPU
+fields are absent. The logical count is `os.cpus().length`, the machine's logical CPUs, not
+`os.availableParallelism()`, which reflects the CPU affinity and container limits of the build
+process. birthplace reads hardware facts only. It never records the user name, home directory,
+shell, or host name.
+
+These are birthplace-specific attributes, not OTel semantic conventions. They mirror semconv
+`host.*` naming so they are easy to recognize: `host.arch` and `host.cpu.model.name` exist in the
+[host registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/host/) with
+Development stability as of semantic conventions 1.43.0, while `host.cpu.logical.count`,
+`host.memory.total`, and `host.endianness` have no semconv counterpart.
+
+### Build host versus runtime host
+
+The `birthplace.` prefix is deliberate. OpenTelemetry's `hostDetector` and the semconv `host.*`
+attributes describe the machine the process is **running on**. `birthplace.host.*` describes the
+machine that **built** the artifact, which is usually a CI runner with a different architecture,
+CPU, and memory size. Writing build-machine values to unprefixed `host.*` keys would overwrite or
+contradict the runtime host, so birthplace never does that. Register both detectors to see both
+machines on the same resource:
+
+```js
+resourceDetectors: [
+  birthplaceDetector({ file, includeHostAttributes: true }), // birthplace.host.arch: amd64
+  hostDetector, // host.arch: arm64
+];
+```
+
+Machine facts make the birthplace file differ between two builds of the same commit on different
+runners, so capturing them makes the build output non-reproducible. That is why capture is opt-in
+and why reproducible builds should leave `--host` off, just as they pin `SOURCE_DATE_EPOCH` or pass
+`--no-timestamp`.
+
 ## OpenTelemetry attributes
 
 `toOtelAttributes(info, options?)` validates the input and returns only defined values. The dedicated
@@ -282,6 +354,9 @@ converter to additionally emit `birthplace.source.dirty`, `birthplace.build.time
 conventions. The birthplace file always retains those fields whether or not you export them as
 attributes.
 
+`includeHostAttributes: true` is an independent switch for the `birthplace.host.*` attributes
+described in [Build machine](#build-machine). Attribute values are strings, booleans, or numbers.
+
 ## CLI
 
 Generate a JSON birthplace file:
@@ -297,8 +372,8 @@ npx birthplace generate \
   --strict
 ```
 
-`generate` accepts `--format json|esm`, `--timestamp <ISO timestamp>`, and `--no-timestamp` in
-addition to the options above. Without `--output`, JSON writes `birthplace.json` and ESM writes
+`generate` accepts `--format json|esm`, `--timestamp <ISO timestamp>`, `--no-timestamp`, and
+`--host` (record the [build machine](#build-machine)) in addition to the options above. Without `--output`, JSON writes `birthplace.json` and ESM writes
 `birthplace.mjs` in the current directory.
 
 Bare `birthplace` is equivalent to `birthplace generate`.
@@ -309,6 +384,7 @@ Inspect validated JSON or its OpenTelemetry mapping:
 npx birthplace inspect dist/birthplace.json
 npx birthplace inspect dist/birthplace.json --otel
 npx birthplace inspect dist/birthplace.json --otel --include-custom-attributes
+npx birthplace inspect dist/birthplace.json --otel --include-host-attributes
 ```
 
 Malformed data, invalid options, missing strict fields, and filesystem failures print a concise error
@@ -319,24 +395,24 @@ to stderr and exit nonzero.
 birthplace replaces the `ngrv` package. It is a new package name with a renamed API, CLI, and
 generated file; there is no compatibility alias.
 
-| ngrv                                     | birthplace                                                                                                     |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `ngrv` package                           | `birthplace` package                                                                                           |
-| `ngrv/otel`                              | `birthplace/otel`                                                                                              |
-| `.ngrv` file and `NGRV_*` variables      | Removed; see the host capture feature tracked in [issue #22](https://github.com/thilllon/birthplace/issues/22) |
-| `ngrv create` / `ngrv read`              | `birthplace generate` / `birthplace inspect`                                                                   |
-| `build-info.json`                        | `birthplace.json`                                                                                              |
-| `ngrvDetector`                           | `birthplaceDetector`                                                                                           |
-| `--name`                                 | `--service-name`                                                                                               |
-| `--include-custom`                       | `--include-custom-attributes`                                                                                  |
-| `BuildInfo`                              | `Birthplace`                                                                                                   |
-| `collectBuildInfo` / `readBuildInfo`     | `collectBirthplace` / `readBirthplace`                                                                         |
-| `writeBuildInfo`                         | `writeBirthplace`                                                                                              |
-| `validateBuildInfo`                      | Not exported; `readBirthplace`, `writeBirthplace`, and `toOtelAttributes` validate their input                 |
-| `NgrvError` with `NGRV_*_ERROR` codes    | `BirthplaceError` with `BIRTHPLACE_*_ERROR` codes                                                              |
-| `ngrv.source.dirty`, `ngrv.build.*`      | `birthplace.source.dirty`, `birthplace.build.timestamp`, `birthplace.build.timestamp_source`                   |
-| Named `buildInfo` export of the ESM file | Default export only                                                                                            |
-| `engrave()` / `readEngrave()`            | `collectBirthplace` plus `writeBirthplace` at build time; `readBirthplace` or `birthplaceDetector` at runtime  |
+| ngrv                                     | birthplace                                                                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ngrv` package                           | `birthplace` package                                                                                          |
+| `ngrv/otel`                              | `birthplace/otel`                                                                                             |
+| `.ngrv` file and `NGRV_*` variables      | Removed; opt-in [build machine](#build-machine) capture with `--host` records hardware facts only             |
+| `ngrv create` / `ngrv read`              | `birthplace generate` / `birthplace inspect`                                                                  |
+| `build-info.json`                        | `birthplace.json`                                                                                             |
+| `ngrvDetector`                           | `birthplaceDetector`                                                                                          |
+| `--name`                                 | `--service-name`                                                                                              |
+| `--include-custom`                       | `--include-custom-attributes`                                                                                 |
+| `BuildInfo`                              | `Birthplace`                                                                                                  |
+| `collectBuildInfo` / `readBuildInfo`     | `collectBirthplace` / `readBirthplace`                                                                        |
+| `writeBuildInfo`                         | `writeBirthplace`                                                                                             |
+| `validateBuildInfo`                      | Not exported; `readBirthplace`, `writeBirthplace`, and `toOtelAttributes` validate their input                |
+| `NgrvError` with `NGRV_*_ERROR` codes    | `BirthplaceError` with `BIRTHPLACE_*_ERROR` codes                                                             |
+| `ngrv.source.dirty`, `ngrv.build.*`      | `birthplace.source.dirty`, `birthplace.build.timestamp`, `birthplace.build.timestamp_source`                  |
+| Named `buildInfo` export of the ESM file | Default export only                                                                                           |
+| `engrave()` / `readEngrave()`            | `collectBirthplace` plus `writeBirthplace` at build time; `readBirthplace` or `birthplaceDetector` at runtime |
 
 An old `.ngrv` file is not a valid birthplace file: regenerate it during the build with
 `birthplace generate --output dist/birthplace.json --strict` instead of renaming it, and copy the

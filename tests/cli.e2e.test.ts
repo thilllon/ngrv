@@ -138,6 +138,63 @@ describe("built CLI", () => {
     });
   });
 
+  it("captures the build machine only with --host", () => {
+    const file = join(temporaryDirectory, "host.json");
+    const generated = runCli(
+      "generate",
+      "--cwd",
+      fixture,
+      "--output",
+      file,
+      "--revision",
+      revision,
+      "--no-timestamp",
+      "--host",
+    );
+
+    expect(generated.status).toBe(0);
+    expect(generated.stderr).toBe("");
+    const { host } = JSON.parse(readFileSync(file, "utf8"));
+    expect(typeof host.arch).toBe("string");
+    expect(["little", "big"]).toContain(host.endianness);
+
+    const standard = runCli("inspect", file, "--otel");
+    const custom = runCli(
+      "inspect",
+      file,
+      "--otel",
+      "--include-custom-attributes",
+    );
+    const withHost = runCli(
+      "inspect",
+      file,
+      "--otel",
+      "--include-host-attributes",
+    );
+    expect(withHost.status).toBe(0);
+    for (const result of [standard, custom]) {
+      expect(result.status).toBe(0);
+      expect(
+        Object.keys(JSON.parse(result.stdout)).filter((key) =>
+          key.startsWith("birthplace.host."),
+        ),
+      ).toEqual([]);
+    }
+    const attributes = JSON.parse(withHost.stdout);
+    expect(attributes["birthplace.host.arch"]).toBe(host.arch);
+    expect(attributes["birthplace.host.endianness"]).toBe(host.endianness);
+    if (host.cpu?.logical !== undefined) {
+      expect(attributes["birthplace.host.cpu.logical.count"]).toBe(
+        host.cpu.logical.count,
+      );
+    }
+    if (host.memory !== undefined) {
+      expect(attributes["birthplace.host.memory.total"]).toBe(
+        host.memory.total,
+      );
+    }
+  });
+
   it("writes an importable ESM metadata module", () => {
     const birthplaceFile = join(temporaryDirectory, "birthplace.mjs");
     const generated = runCli(

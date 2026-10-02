@@ -1,10 +1,12 @@
 import { Birthplace, validateBirthplace } from "./birthplace";
 
-export type OtelAttributes = Record<string, string | boolean>;
+export type OtelAttributes = Record<string, string | number | boolean>;
 
 export interface OtelAttributeOptions {
   /** Include custom dirty-state and build-time attributes. Defaults to false. */
   includeCustomAttributes?: boolean;
+  /** Include the build machine as birthplace.host.* attributes. Defaults to false. */
+  includeHostAttributes?: boolean;
 }
 
 /**
@@ -12,6 +14,11 @@ export interface OtelAttributeOptions {
  * semantic conventions 1.43.0 (the @opentelemetry/semantic-conventions version in the
  * development tree). service.name and service.version are Stable. vcs.ref.head.revision
  * and cicd.pipeline.run.url.full are Release Candidate since 1.43.0, not Stable.
+ *
+ * birthplace.host.* attributes are custom, not semantic conventions: semconv host.*
+ * describes the machine a process runs on, while these describe the machine that built
+ * it. Each key is "birthplace." plus the JSON path. They mirror semconv naming where a
+ * counterpart exists (host.arch and host.cpu.model.name, both Development in 1.43.0).
  */
 export const toOtelAttributes = (
   value: Birthplace,
@@ -43,6 +50,22 @@ export const toOtelAttributes = (
     if (info.build.timestampSource !== undefined) {
       attributes["birthplace.build.timestamp_source"] =
         info.build.timestampSource;
+    }
+  }
+
+  if (options.includeHostAttributes && info.host !== undefined) {
+    const { host } = info;
+    const hostAttributes: Record<string, string | number | undefined> = {
+      "birthplace.host.arch": host.arch,
+      "birthplace.host.cpu.model.name": host.cpu?.model?.name,
+      "birthplace.host.cpu.logical.count": host.cpu?.logical?.count,
+      "birthplace.host.memory.total": host.memory?.total,
+      "birthplace.host.endianness": host.endianness,
+    };
+    for (const [key, attribute] of Object.entries(hostAttributes)) {
+      if (attribute !== undefined) {
+        attributes[key] = attribute;
+      }
     }
   }
 

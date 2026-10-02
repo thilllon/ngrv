@@ -74,6 +74,42 @@ describe("birthplaceDetector", () => {
     });
   });
 
+  it("only adds build machine attributes when explicitly requested", () => {
+    const file = fixtureFile();
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...metadata,
+        host: {
+          arch: "amd64",
+          cpu: { model: { name: "Fixture CPU" }, logical: { count: 4 } },
+          memory: { total: 8_589_934_592 },
+          endianness: "little",
+        },
+      }),
+    );
+    const standard = {
+      "service.name": "payments",
+      "service.version": "4.5.6",
+      "vcs.ref.head.revision": "a".repeat(40),
+      "cicd.pipeline.run.url.full": "https://ci.example.test/builds/42",
+    };
+
+    expect(birthplaceDetector({ file }).detect().attributes).toEqual(standard);
+    const detector: ResourceDetector = birthplaceDetector({
+      file,
+      includeHostAttributes: true,
+    });
+    expect(detectResources({ detectors: [detector] }).attributes).toEqual({
+      ...standard,
+      "birthplace.host.arch": "amd64",
+      "birthplace.host.cpu.model.name": "Fixture CPU",
+      "birthplace.host.cpu.logical.count": 4,
+      "birthplace.host.memory.total": 8_589_934_592,
+      "birthplace.host.endianness": "little",
+    });
+  });
+
   it("resolves its default birthplace file against the directory at factory creation", () => {
     const directory = mkdtempSync(
       join(tmpdir(), "birthplace-default-detector-"),
@@ -122,6 +158,24 @@ describe("birthplaceDetector", () => {
       "birthplace.source.dirty": false,
       "birthplace.build.timestamp": "2026-09-21T01:02:03.000Z",
       "birthplace.build.timestamp_source": "explicit",
+    });
+  });
+
+  it("honors includeHostAttributes for an already-loaded object", () => {
+    const info: Birthplace = {
+      ...metadata,
+      host: { arch: "arm64", memory: { total: 17_179_869_184 } },
+    };
+    expect(birthplaceDetector({ info }).detect().attributes).not.toHaveProperty(
+      "birthplace.host.arch",
+    );
+    expect(
+      birthplaceDetector({ info, includeHostAttributes: true }).detect()
+        .attributes,
+    ).toMatchObject({
+      "service.name": "payments",
+      "birthplace.host.arch": "arm64",
+      "birthplace.host.memory.total": 17_179_869_184,
     });
   });
 

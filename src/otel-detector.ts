@@ -36,7 +36,11 @@ export interface BirthplaceDetector {
 export const birthplaceDetector = (
   options: BirthplaceDetectorOptions = {},
 ): BirthplaceDetector => {
-  const { info, includeCustomAttributes = false } = options;
+  const {
+    info,
+    includeCustomAttributes = false,
+    includeHostAttributes = false,
+  } = options;
 
   if (info !== undefined) {
     if (options.file !== undefined) {
@@ -47,7 +51,10 @@ export const birthplaceDetector = (
     }
     return {
       detect: () => ({
-        attributes: toOtelAttributes(info, { includeCustomAttributes }),
+        attributes: toOtelAttributes(info, {
+          includeCustomAttributes,
+          includeHostAttributes,
+        }),
       }),
     };
   }
@@ -62,6 +69,7 @@ export const birthplaceDetector = (
     detect: () => ({
       attributes: toOtelAttributes(readBirthplace(file), {
         includeCustomAttributes,
+        includeHostAttributes,
       }),
     }),
   };
