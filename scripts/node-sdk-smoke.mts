@@ -4,6 +4,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -24,9 +25,12 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const moduleLoader = Module as typeof Module & {
   _load(request: string, parent: unknown, isMain: boolean): unknown;
 };
-const cli = resolve(process.argv[2] ?? join(__dirname, "../dist/cli.cjs"));
+// `--info` hands the detector an imported ESM birthplace file instead of a JSON path.
+const useInfo = process.argv.includes("--info");
+const positionals = process.argv.slice(2).filter((arg) => arg !== "--info");
+const cli = resolve(positionals[0] ?? join(__dirname, "../dist/cli.cjs"));
 const detectorModule = resolve(
-  process.argv[3] ?? join(__dirname, "../dist/otel.cjs"),
+  positionals[1] ?? join(__dirname, "../dist/otel.cjs"),
 );
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "birthplace-node-sdk-"));
 const buildDirectory = join(temporaryDirectory, "build");
@@ -55,7 +59,8 @@ async function verify() {
       version: "2.0.0",
     }),
   );
-  const generatedFile = join(buildDirectory, "birthplace.json");
+  const fileName = useInfo ? "birthplace.mjs" : "birthplace.json";
+  const generatedFile = join(buildDirectory, fileName);
   execFileSync(
     process.execPath,
     [
@@ -65,6 +70,8 @@ async function verify() {
       buildDirectory,
       "--output",
       generatedFile,
+      "--format",
+      useInfo ? "esm" : "json",
       "--revision",
       "c".repeat(40),
       "--timestamp",
@@ -73,10 +80,17 @@ async function verify() {
     ],
     { stdio: "pipe" },
   );
-  const birthplaceFile = join(runtimeDirectory, "birthplace.json");
+  const birthplaceFile = join(runtimeDirectory, fileName);
   copyFileSync(generatedFile, birthplaceFile);
   rmSync(buildDirectory, { recursive: true, force: true });
   process.chdir(runtimeDirectory);
+  let info: unknown;
+  if (useInfo) {
+    info = (await import(pathToFileURL(birthplaceFile).href)).default;
+    // Nothing is left on disk: the detector can only succeed from the imported object.
+    rmSync(birthplaceFile);
+    assert.deepEqual(readdirSync(runtimeDirectory), []);
+  }
 
   moduleLoader._load = function (request, parent, isMain) {
     if (
@@ -92,7 +106,9 @@ async function verify() {
   const spans: tracing.ReadableSpan[] = [];
   const sdk = new NodeSDK({
     resourceDetectors: [
-      birthplaceDetector({ file: pathToFileURL(birthplaceFile) }),
+      useInfo
+        ? birthplaceDetector({ info })
+        : birthplaceDetector({ file: pathToFileURL(birthplaceFile) }),
       processDetector,
       hostDetector,
       envDetector,
@@ -112,7 +128,7 @@ async function verify() {
     const tracer = trace.getTracer("birthplace-integration");
     tracer.startSpan("first-request").end();
     // Later filesystem changes must not change the SDK's captured build identity.
-    writeFileSync(birthplaceFile, "{}");
+    writeFileSync(join(runtimeDirectory, "birthplace.json"), "{}");
     tracer.startSpan("second-request").end();
   } finally {
     await sdk.shutdown();
@@ -132,7 +148,9 @@ async function verify() {
     );
   }
   console.log(
-    "NodeSDK smoke passed: CLI -> packaged JSON -> detector -> exported spans",
+    useInfo
+      ? "NodeSDK smoke passed: CLI -> imported ESM -> detector -> exported spans"
+      : "NodeSDK smoke passed: CLI -> packaged JSON -> detector -> exported spans",
   );
 }
 

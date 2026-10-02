@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/otel.ts", "src/cli.ts"],
+  entry: ["src/index.ts", "src/otel.ts", "src/attributes.ts", "src/cli.ts"],
   format: ["esm", "cjs"],
   platform: "node",
   target: "node22",

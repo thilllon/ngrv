@@ -95,8 +95,64 @@ reads package.json, regenerates metadata, or mutates `process.env`.
 Direct `detect()` failures throw `BirthplaceError`. OpenTelemetry catches detector failures and skips
 the failed detector (diagnostic logging can expose the error). If metadata is required for
 application startup, explicitly call `readBirthplace` before starting the SDK. Do not rely on
-detector failures to terminate the application. The detector reads JSON only; import a generated ESM
-birthplace file directly and use `toOtelAttributes` for that alternative.
+detector failures to terminate the application. With `file`, the detector reads JSON only; to use a
+generated ESM birthplace file, import it and pass the object as `info`, as shown next.
+
+### Import instead of read
+
+Bundled and serverless deployments (a single-file bundle, a serverless function, Next.js output file
+tracing) ship only the files their tooling can trace from imports. A `birthplace.json` that is read
+through `fs` at runtime is easily left out, and because OpenTelemetry swallows detector failures, the
+missing file does not crash anything: the build attributes are silently dropped. An imported module
+is always part of the bundle, so importing is the robust choice there.
+
+Generate an ESM birthplace file inside the source tree, before bundling:
+
+```sh
+birthplace generate --format esm --output src/birthplace.mjs
+```
+
+Import it and hand the object to the detector:
+
+```js
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { birthplaceDetector } from 'birthplace/otel';
+import birthplace from './birthplace.mjs';
+
+const sdk = new NodeSDK({
+  resourceDetectors: [birthplaceDetector({ info: birthplace })],
+});
+
+sdk.start();
+```
+
+`birthplaceDetector({ info, includeCustomAttributes?, includeHostAttributes? })` performs no file
+access. The object is validated during `detect()`, exactly like a file. Passing both `file` and `info` throws a
+`BirthplaceError` with code `BIRTHPLACE_VALIDATION_ERROR` when the detector is created, so that
+mistake is not swallowed by OpenTelemetry. The generated file is build output: add
+`src/birthplace.mjs` to `.gitignore`.
+
+TypeScript projects need `allowJs` to import the file. It carries a
+`/** @type {import('birthplace').Birthplace} */` annotation, so the import is typed as `Birthplace`
+and needs no cast. Without `allowJs`, put a declaration next to it instead (`src/birthplace.d.mts`):
+
+```ts
+declare const birthplace: import('birthplace').Birthplace;
+export default birthplace;
+```
+
+`birthplace/otel` requires Node.js: it loads `node:fs`, `node:path`, `node:url`, and `node:crypto`
+when imported, even if only `info` is used. For a runtime or bundle without Node.js built-ins, import
+the mapping from `birthplace/attributes`, which loads no `node:` module, and build the resource
+yourself:
+
+```js
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import { toOtelAttributes } from 'birthplace/attributes';
+import birthplace from './birthplace.mjs';
+
+const resource = resourceFromAttributes(toOtelAttributes(birthplace));
+```
 
 ## Build metadata
 
@@ -270,6 +326,12 @@ and why reproducible builds should leave `--host` off, just as they pin `SOURCE_
 `birthplace/otel` entrypoint includes birthplace file reading and conversion, without loading the Git
 collector. No OpenTelemetry SDK is installed as a runtime dependency.
 
+| Entry point             | Exports                                              | Needs Node.js built-ins |
+| ----------------------- | ---------------------------------------------------- | ----------------------- |
+| `birthplace`            | Collection, reading, writing, detector, and mapping  | Yes                     |
+| `birthplace/otel`       | `birthplaceDetector`, `toOtelAttributes`             | Yes                     |
+| `birthplace/attributes` | `toOtelAttributes`, `BirthplaceError`, and the types | No                      |
+
 | Build metadata    | Resource attribute           |
 | ----------------- | ---------------------------- |
 | `service.name`    | `service.name`               |
@@ -370,9 +432,10 @@ pnpm test:packaging
 ```
 
 Tests include temporary Git repositories, built CLI subprocesses, actual OTel resource detection,
-and a real NodeSDK exporting spans from the packaged birthplace file. The package smoke test installs
-the tarball into an isolated consumer and verifies CommonJS/ESM imports and declarations.
+and a real NodeSDK exporting spans from the packaged birthplace file and from an imported birthplace
+object. The package smoke test installs the tarball into an isolated consumer and verifies
+CommonJS/ESM imports and declarations, and that `birthplace/attributes` loads no Node.js built-in.
 
 Node.js 22 or later is required. CJS and ESM have separate entry points and matching declarations;
-use `birthplace` and `birthplace/otel` rather than depending on generated filenames under `dist/`.
+use `birthplace`, `birthplace/otel`, and `birthplace/attributes` rather than depending on generated filenames under `dist/`.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the issue, PR, and Changesets workflow.
