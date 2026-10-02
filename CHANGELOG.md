@@ -8,12 +8,11 @@
   record with the application, and load it into OpenTelemetry Node.js resources.
 
   - CLI: `birthplace generate` (the default command) captures the service name and version, the
-    source revision and repository, and the build timestamp; `birthplace inspect` prints a validated
-    file or its OpenTelemetry mapping. Flags include `--service-name`, `--output`, `--format`,
+    source revision and dirty state, the CI run URL, and the build timestamp; `birthplace inspect`
+    prints a validated file or its OpenTelemetry mapping. Flags include `--service-name`, `--output`, `--format`,
     `--strict`, and `--include-custom-attributes`.
-  - The generated file is the birthplace file: `birthplace.json`, or `birthplace.mjs` with a default
-    export only.
-  - API names: the `Birthplace` type, `collectBirthplace`, `readBirthplace`, `writeBirthplace`,
+  - Output: `birthplace.json`, or `birthplace.mjs` with the record as its default export.
+  - API: the `Birthplace` type, `collectBirthplace`, `readBirthplace`, `writeBirthplace`,
     `toOtelAttributes`, `birthplaceDetector`, and `BirthplaceError` with `BIRTHPLACE_*_ERROR` codes.
   - OpenTelemetry entry points: `birthplace/otel` provides `birthplaceDetector` and
     `toOtelAttributes` without loading the Git collector, and `birthplace/attributes` provides the

@@ -2,4 +2,4 @@
 'birthplace': patch
 ---
 
-Refresh the README and changelog shipped with the package.
+Refresh the README shipped with the package.
