@@ -5,11 +5,13 @@ import {
   processDetector,
 } from "@opentelemetry/resources";
 import { NodeSDK, tracing } from "@opentelemetry/sdk-node";
-import { ngrvDetector } from "ngrv/otel";
+import { birthplaceDetector } from "birthplace/otel";
 
 const sdk = new NodeSDK({
   resourceDetectors: [
-    ngrvDetector({ file: new URL("../build-info.json", import.meta.url) }),
+    birthplaceDetector({
+      file: new URL("../birthplace.json", import.meta.url),
+    }),
     processDetector,
     hostDetector,
     envDetector,
@@ -19,5 +21,5 @@ const sdk = new NodeSDK({
 });
 
 sdk.start();
-trace.getTracer("ngrv-example").startSpan("example-request").end();
+trace.getTracer("birthplace-example").startSpan("example-request").end();
 await sdk.shutdown();

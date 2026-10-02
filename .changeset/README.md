@@ -1,6 +1,6 @@
 # Changesets
 
-Run `pnpm changeset` for publishable changes. Select `ngrv`, choose the appropriate
+Run `pnpm changeset` for publishable changes. Select `birthplace`, choose the appropriate
 bump and describe the user-facing behavior. Repository-only documentation and
 maintenance changes do not need a Changeset.
 

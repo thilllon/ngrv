@@ -19,7 +19,9 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repository = resolve(__dirname, "..");
-const temporaryDirectory = mkdtempSync(join(tmpdir(), "ngrv-package-smoke-"));
+const temporaryDirectory = mkdtempSync(
+  join(tmpdir(), "birthplace-package-smoke-"),
+);
 const packageDirectory = join(temporaryDirectory, "package");
 const consumerDirectory = join(temporaryDirectory, "consumer");
 const xdgConfigDirectory = join(temporaryDirectory, "xdg");
@@ -70,7 +72,7 @@ try {
   writeFileSync(
     join(consumerDirectory, "package.json"),
     JSON.stringify({
-      name: "ngrv-smoke-consumer",
+      name: "birthplace-smoke-consumer",
       version: "1.0.0",
       private: true,
       dependencies: {
@@ -80,7 +82,7 @@ try {
             "utf8",
           ),
         ).version,
-        ngrv: `file:${archive}`,
+        birthplace: `file:${archive}`,
       },
     }),
   );
@@ -96,15 +98,17 @@ const assert = require('assert/strict');
 const Module = require('module');
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
-  if (['child_process', 'node:child_process', 'os', 'node:os'].includes(request)) throw new Error('ngrv/otel loaded ' + request);
+  if (['child_process', 'node:child_process', 'os', 'node:os'].includes(request)) throw new Error('birthplace/otel loaded ' + request);
   return originalLoad.apply(this, arguments);
 };
-const otel = require('ngrv/otel');
+const otel = require('birthplace/otel');
 assert.deepEqual(otel.toOtelAttributes({ schemaVersion: 1, service: { name: 'cjs' }, source: {}, build: {} }), { 'service.name': 'cjs' });
-assert.equal(typeof otel.ngrvDetector, 'function');
+assert.equal(typeof otel.birthplaceDetector, 'function');
 Module._load = originalLoad;
-const root = require('ngrv');
-assert.equal(typeof root.collectBuildInfo, 'function');
+const root = require('birthplace');
+assert.equal(typeof root.collectBirthplace, 'function');
+assert.equal(root.validateBirthplace, undefined);
+assert.equal(otel.validateBirthplace, undefined);
 assert.equal(root.engrave, undefined);
 assert.equal(root.readEngrave, undefined);
 `;
@@ -113,13 +117,14 @@ assert.equal(root.readEngrave, undefined);
 
   const esm = `
 import assert from 'node:assert/strict';
-import * as root from 'ngrv';
-import { collectBuildInfo } from 'ngrv';
-import { toOtelAttributes, ngrvDetector } from 'ngrv/otel';
-assert.equal(typeof collectBuildInfo, 'function');
+import * as root from 'birthplace';
+import { collectBirthplace } from 'birthplace';
+import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';
+assert.equal(typeof collectBirthplace, 'function');
+assert.equal('validateBirthplace' in root, false);
 assert.equal('engrave' in root, false);
 assert.equal('readEngrave' in root, false);
-assert.equal(typeof ngrvDetector, 'function');
+assert.equal(typeof birthplaceDetector, 'function');
 assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, source: {}, build: {} }), { 'service.name': 'esm' });
 `;
   writeFileSync(join(consumerDirectory, "esm.mjs"), esm);
@@ -130,38 +135,38 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
   const installedPackageDirectory = join(
     consumerDirectory,
     "node_modules",
-    "ngrv",
+    "birthplace",
   );
   const installedManifest = JSON.parse(
     readFileSync(join(installedPackageDirectory, "package.json"), "utf8"),
   );
-  assert.deepEqual(Object.keys(installedManifest.bin), ["ngrv"]);
+  assert.deepEqual(Object.keys(installedManifest.bin), ["birthplace"]);
   for (const target of Object.values(
     installedManifest.bin as Record<string, string>,
   )) {
     run(process.execPath, [join(installedPackageDirectory, target), "--help"]);
   }
 
-  const artifact = join(consumerDirectory, "build-info.json");
-  run(join(binDirectory, `ngrv${executableSuffix}`), [
+  const birthplaceFile = join(consumerDirectory, "birthplace.json");
+  run(join(binDirectory, `birthplace${executableSuffix}`), [
     "generate",
     "--cwd",
     consumerDirectory,
     "--output",
-    artifact,
+    birthplaceFile,
     "--revision",
     "c".repeat(40),
     "--no-timestamp",
     "--strict",
   ]);
   const inspected = JSON.parse(
-    run(join(binDirectory, `ngrv${executableSuffix}`), [
+    run(join(binDirectory, `birthplace${executableSuffix}`), [
       "inspect",
-      artifact,
+      birthplaceFile,
       "--otel",
     ]),
   );
-  assert.equal(inspected["service.name"], "ngrv-smoke-consumer");
+  assert.equal(inspected["service.name"], "birthplace-smoke-consumer");
   assert.equal(inspected["service.version"], "1.0.0");
   assert.equal(inspected["vcs.ref.head.revision"], "c".repeat(40));
 
@@ -173,13 +178,13 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
     join(installedPackageDirectory, "dist/otel.cjs"),
   ]);
 
-  const moduleArtifact = join(consumerDirectory, "build-info.mjs");
-  run(join(binDirectory, `ngrv${executableSuffix}`), [
+  const moduleFile = join(consumerDirectory, "birthplace.mjs");
+  run(join(binDirectory, `birthplace${executableSuffix}`), [
     "generate",
     "--cwd",
     consumerDirectory,
     "--output",
-    moduleArtifact,
+    moduleFile,
     "--format",
     "esm",
     "--revision",
@@ -192,15 +197,16 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
       "--input-type=module",
       "--eval",
       `import(${JSON.stringify(
-        pathToFileURL(moduleArtifact).href,
-      )}).then(({default: value}) => console.log(JSON.stringify(value)))`,
+        pathToFileURL(moduleFile).href,
+      )}).then((namespace) => console.log(JSON.stringify({ keys: Object.keys(namespace), value: namespace.default })))`,
     ]),
   );
-  assert.equal(imported.source.revision, "d".repeat(40));
+  assert.deepEqual(imported.keys, ["default"]);
+  assert.equal(imported.value.source.revision, "d".repeat(40));
 
   writeFileSync(
     join(consumerDirectory, "types.ts"),
-    `import { collectBuildInfo, type BuildInfo } from 'ngrv';\nimport { toOtelAttributes, ngrvDetector } from 'ngrv/otel';\nconst info: BuildInfo = collectBuildInfo({ timestamp: false });\ntoOtelAttributes(info);\nngrvDetector({ file: new URL('file:///app/build-info.json') }).detect();\n`,
+    `import { collectBirthplace, type Birthplace } from 'birthplace';\nimport { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nconst info: Birthplace = collectBirthplace({ timestamp: false });\ntoOtelAttributes(info);\nbirthplaceDetector({ file: new URL('file:///app/birthplace.json') }).detect();\n`,
   );
   writeFileSync(
     join(consumerDirectory, "types.mts"),
@@ -224,7 +230,10 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
     { cwd: consumerDirectory, stdio: "pipe" },
   );
 
-  assert.equal(JSON.parse(readFileSync(artifact, "utf8")).schemaVersion, 1);
+  assert.equal(
+    JSON.parse(readFileSync(birthplaceFile, "utf8")).schemaVersion,
+    1,
+  );
   console.log(`Packed consumer smoke passed: ${basename(archive)}`);
 } finally {
   rmSync(temporaryDirectory, { recursive: true, force: true });

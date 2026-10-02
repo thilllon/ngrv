@@ -1,7 +1,16 @@
 {
-  "name": "ngrv",
-  "version": "5.0.0",
-  "description": "Capture build metadata and load it into OpenTelemetry Node.js resources",
+  "name": "birthplace",
+  "version": "0.0.0",
+  "description": "Record where and when an artifact was built and load it into OpenTelemetry Node.js resources",
+  "keywords": [
+    "opentelemetry",
+    "otel",
+    "resource-detector",
+    "build-info",
+    "build-metadata",
+    "git",
+    "ci"
+  ],
   "type": "commonjs",
   "sideEffects": [
     "./dist/cli.cjs",
@@ -16,8 +25,10 @@
   "author": "thilllon <thilllon970@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thilllon/ngrv.git"
+    "url": "git+https://github.com/thilllon/birthplace.git"
   },
+  "homepage": "https://github.com/thilllon/birthplace#readme",
+  "bugs": "https://github.com/thilllon/birthplace/issues",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.cts",
@@ -45,7 +56,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "ngrv": "dist/cli.cjs"
+    "birthplace": "dist/cli.cjs"
   },
   "files": [
     "dist"

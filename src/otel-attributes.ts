@@ -1,4 +1,4 @@
-import { BuildInfo, validateBuildInfo } from "./build-info";
+import { Birthplace, validateBirthplace } from "./birthplace";
 
 export type OtelAttributes = Record<string, string | boolean>;
 
@@ -7,12 +7,17 @@ export interface OtelAttributeOptions {
   includeCustomAttributes?: boolean;
 }
 
-/** Maps metadata using OTel semantic conventions 1.44.0 (VCS/CI/CD are RC). */
+/**
+ * Maps build metadata to OTel semantic-convention attribute names, checked against
+ * semantic conventions 1.43.0 (the @opentelemetry/semantic-conventions version in the
+ * development tree). service.name and service.version are Stable. vcs.ref.head.revision
+ * and cicd.pipeline.run.url.full are Release Candidate since 1.43.0, not Stable.
+ */
 export const toOtelAttributes = (
-  value: BuildInfo,
+  value: Birthplace,
   options: OtelAttributeOptions = {},
 ): OtelAttributes => {
-  const info = validateBuildInfo(value);
+  const info = validateBirthplace(value);
   const attributes: OtelAttributes = {};
 
   if (info.service.name !== undefined) {
@@ -30,13 +35,14 @@ export const toOtelAttributes = (
 
   if (options.includeCustomAttributes) {
     if (info.source.dirty !== undefined) {
-      attributes["ngrv.source.dirty"] = info.source.dirty;
+      attributes["birthplace.source.dirty"] = info.source.dirty;
     }
     if (info.build.timestamp !== undefined) {
-      attributes["ngrv.build.timestamp"] = info.build.timestamp;
+      attributes["birthplace.build.timestamp"] = info.build.timestamp;
     }
     if (info.build.timestampSource !== undefined) {
-      attributes["ngrv.build.timestamp_source"] = info.build.timestampSource;
+      attributes["birthplace.build.timestamp_source"] =
+        info.build.timestampSource;
     }
   }
 

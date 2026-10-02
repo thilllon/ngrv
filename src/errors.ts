@@ -1,18 +1,18 @@
-export type NgrvErrorCode =
-  | "NGRV_VALIDATION_ERROR"
-  | "NGRV_COLLECTION_ERROR"
-  | "NGRV_READ_ERROR"
-  | "NGRV_WRITE_ERROR";
+export type BirthplaceErrorCode =
+  | "BIRTHPLACE_VALIDATION_ERROR"
+  | "BIRTHPLACE_COLLECTION_ERROR"
+  | "BIRTHPLACE_READ_ERROR"
+  | "BIRTHPLACE_WRITE_ERROR";
 
-export class NgrvError extends Error {
-  readonly code: NgrvErrorCode;
+export class BirthplaceError extends Error {
+  readonly code: BirthplaceErrorCode;
   readonly cause?: unknown;
 
-  constructor(code: NgrvErrorCode, message: string, cause?: unknown) {
+  constructor(code: BirthplaceErrorCode, message: string, cause?: unknown) {
     super(message);
-    this.name = "NgrvError";
+    this.name = "BirthplaceError";
     this.code = code;
     this.cause = cause;
-    Object.setPrototypeOf(this, NgrvError.prototype);
+    Object.setPrototypeOf(this, BirthplaceError.prototype);
   }
 }

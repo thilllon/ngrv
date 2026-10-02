@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
-it("carries the build CLI artifact into real NodeSDK exported spans after packaging", () => {
+it("carries the generated birthplace file into real NodeSDK exported spans after packaging", () => {
   const result = spawnSync(
     process.execPath,
     [

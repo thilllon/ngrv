@@ -1,11 +1,11 @@
 name: Bug report
-description: Report a reproducible NGRV problem
+description: Report a reproducible birthplace problem
 body:
   - type: textarea
     id: reproduction
     attributes:
       label: Reproduction
-      description: Include the NGRV and Node.js versions, commands, and a minimal example.
+      description: Include the birthplace and Node.js versions, commands, and a minimal example.
     validations:
       required: true
   - type: textarea

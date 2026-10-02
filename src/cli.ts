@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
 import { Command, Option } from "commander";
-import { collectBuildInfo, CollectBuildInfoOptions } from "./collect";
-import { NgrvError } from "./errors";
+import { collectBirthplace, CollectBirthplaceOptions } from "./collect";
+import { BirthplaceError } from "./errors";
 import { toOtelAttributes } from "./otel";
-import { readBuildInfo, writeBuildInfo } from "./storage";
+import { readBirthplace, writeBirthplace } from "./storage";
 
 const program = new Command();
 
 const reportError = (error: unknown): void => {
-  if (error instanceof NgrvError) {
+  if (error instanceof BirthplaceError) {
     console.error(`[${error.code}] ${error.message}`);
   } else if (error instanceof Error) {
     console.error(error.message);
@@ -21,19 +21,19 @@ const reportError = (error: unknown): void => {
 
 program
   .command("generate", { isDefault: true })
-  .description("generate a validated build metadata artifact")
+  .description("generate a birthplace file with validated build metadata")
   .allowExcessArguments(false)
   .option(
     "--cwd <directory>",
     "project directory used for package and Git discovery",
   )
-  .option("--output <file>", "artifact output path")
+  .option("--output <file>", "birthplace file output path")
   .addOption(
-    new Option("--format <format>", "artifact format")
+    new Option("--format <format>", "birthplace file format")
       .choices(["json", "esm"])
       .default("json"),
   )
-  .option("--name <name>", "service name")
+  .option("--service-name <name>", "service name")
   .option("--service-version <version>", "service version")
   .option("--revision <revision>", "full SHA-1 or SHA-256 source revision")
   .option("--build-url <url>", "HTTP(S) CI pipeline run URL")
@@ -45,9 +45,11 @@ program
   )
   .action((options) => {
     try {
-      const collectOptions: CollectBuildInfoOptions = {
+      const collectOptions: CollectBirthplaceOptions = {
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-        ...(options.name === undefined ? {} : { name: options.name }),
+        ...(options.serviceName === undefined
+          ? {}
+          : { name: options.serviceName }),
         ...(options.serviceVersion === undefined
           ? {}
           : { version: options.serviceVersion }),
@@ -62,8 +64,8 @@ program
           : { timestamp: options.timestamp }),
         ...(options.strict === undefined ? {} : { strict: options.strict }),
       };
-      const info = collectBuildInfo(collectOptions);
-      const file = writeBuildInfo(info, {
+      const info = collectBirthplace(collectOptions);
+      const file = writeBirthplace(info, {
         ...(options.output === undefined ? {} : { file: options.output }),
         format: options.format,
       });
@@ -75,19 +77,22 @@ program
 
 program
   .command("inspect [file]")
-  .description("print a validated build metadata artifact")
+  .description("print the validated build metadata of a birthplace file")
   .option("--otel", "print OpenTelemetry resource attributes")
-  .option("--include-custom", "include custom build attributes with --otel")
+  .option(
+    "--include-custom-attributes",
+    "include custom build attributes with --otel",
+  )
   .action(
     (
       file: string | undefined,
-      options: { otel?: boolean; includeCustom?: boolean },
+      options: { otel?: boolean; includeCustomAttributes?: boolean },
     ) => {
       try {
-        const info = readBuildInfo(file);
+        const info = readBirthplace(file);
         const output = options.otel
           ? toOtelAttributes(info, {
-              includeCustomAttributes: options.includeCustom,
+              includeCustomAttributes: options.includeCustomAttributes,
             })
           : info;
         console.log(JSON.stringify(output, null, 2));

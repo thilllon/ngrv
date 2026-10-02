@@ -28,7 +28,7 @@ const cli = resolve(process.argv[2] ?? join(__dirname, "../dist/cli.cjs"));
 const detectorModule = resolve(
   process.argv[3] ?? join(__dirname, "../dist/otel.cjs"),
 );
-const temporaryDirectory = mkdtempSync(join(tmpdir(), "ngrv-node-sdk-"));
+const temporaryDirectory = mkdtempSync(join(tmpdir(), "birthplace-node-sdk-"));
 const buildDirectory = join(temporaryDirectory, "build");
 const runtimeDirectory = join(temporaryDirectory, "runtime");
 const originalDirectory = process.cwd();
@@ -44,7 +44,7 @@ async function verify() {
   process.env.OTEL_LOGS_EXPORTER = "none";
   process.env.OTEL_METRICS_EXPORTER = "none";
   process.env.OTEL_RESOURCE_ATTRIBUTES =
-    "deployment.environment.name=ngrv-smoke";
+    "deployment.environment.name=birthplace-smoke";
 
   mkdirSync(buildDirectory);
   mkdirSync(runtimeDirectory);
@@ -52,10 +52,10 @@ async function verify() {
     join(buildDirectory, "package.json"),
     JSON.stringify({
       name: "sdk-fixture",
-      version: "4.0.0",
+      version: "2.0.0",
     }),
   );
-  const buildArtifact = join(buildDirectory, "build-info.json");
+  const generatedFile = join(buildDirectory, "birthplace.json");
   execFileSync(
     process.execPath,
     [
@@ -64,7 +64,7 @@ async function verify() {
       "--cwd",
       buildDirectory,
       "--output",
-      buildArtifact,
+      generatedFile,
       "--revision",
       "c".repeat(40),
       "--timestamp",
@@ -73,8 +73,8 @@ async function verify() {
     ],
     { stdio: "pipe" },
   );
-  const artifact = join(runtimeDirectory, "build-info.json");
-  copyFileSync(buildArtifact, artifact);
+  const birthplaceFile = join(runtimeDirectory, "birthplace.json");
+  copyFileSync(generatedFile, birthplaceFile);
   rmSync(buildDirectory, { recursive: true, force: true });
   process.chdir(runtimeDirectory);
 
@@ -88,11 +88,11 @@ async function verify() {
     }
     return originalLoad.call(this, request, parent, isMain);
   };
-  const { ngrvDetector } = require(detectorModule);
+  const { birthplaceDetector } = require(detectorModule);
   const spans: tracing.ReadableSpan[] = [];
   const sdk = new NodeSDK({
     resourceDetectors: [
-      ngrvDetector({ file: pathToFileURL(artifact) }),
+      birthplaceDetector({ file: pathToFileURL(birthplaceFile) }),
       processDetector,
       hostDetector,
       envDetector,
@@ -109,10 +109,10 @@ async function verify() {
   });
   try {
     sdk.start();
-    const tracer = trace.getTracer("ngrv-integration");
+    const tracer = trace.getTracer("birthplace-integration");
     tracer.startSpan("first-request").end();
     // Later filesystem changes must not change the SDK's captured build identity.
-    writeFileSync(artifact, "{}");
+    writeFileSync(birthplaceFile, "{}");
     tracer.startSpan("second-request").end();
   } finally {
     await sdk.shutdown();
@@ -121,13 +121,13 @@ async function verify() {
   for (const span of spans) {
     const attributes = span.resource.attributes;
     assert.equal(attributes["service.name"], "sdk-fixture");
-    assert.equal(attributes["service.version"], "4.0.0");
+    assert.equal(attributes["service.version"], "2.0.0");
     assert.equal(attributes["vcs.ref.head.revision"], "c".repeat(40));
     assert.equal(attributes["process.pid"], process.pid);
-    assert.equal(attributes["deployment.environment.name"], "ngrv-smoke");
+    assert.equal(attributes["deployment.environment.name"], "birthplace-smoke");
     assert.equal(attributes["telemetry.sdk.name"], "opentelemetry");
     assert.equal(
-      Object.keys(attributes).some((key) => key.startsWith("ngrv.")),
+      Object.keys(attributes).some((key) => key.startsWith("birthplace.")),
       false,
     );
   }

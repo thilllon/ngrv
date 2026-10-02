@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { NgrvError } from "../src/errors";
-import { ngrvDetector } from "../src/otel";
+import { BirthplaceError } from "../src/errors";
+import { birthplaceDetector } from "../src/otel";
 
 const metadata = {
   schemaVersion: 1,
@@ -19,9 +19,9 @@ const metadata = {
 };
 const directories: string[] = [];
 const fixtureFile = () => {
-  const directory = mkdtempSync(join(tmpdir(), "ngrv-detector-"));
+  const directory = mkdtempSync(join(tmpdir(), "birthplace-detector-"));
   directories.push(directory);
-  return join(directory, "build info.json");
+  return join(directory, "birthplace file.json");
 };
 
 afterEach(() => {
@@ -30,11 +30,11 @@ afterEach(() => {
   }
 });
 
-describe("ngrvDetector", () => {
-  it("reads the packaged artifact lazily through the real OTel detection API", () => {
+describe("birthplaceDetector", () => {
+  it("reads the packaged birthplace file lazily through the real OTel detection API", () => {
     const file = fixtureFile();
     const beforeEnvironment = { ...process.env };
-    const detector: ResourceDetector = ngrvDetector({ file });
+    const detector: ResourceDetector = birthplaceDetector({ file });
     writeFileSync(file, JSON.stringify(metadata));
     const resource = detectResources({ detectors: [detector] });
     expect(resource.attributes).toEqual({
@@ -50,7 +50,7 @@ describe("ngrvDetector", () => {
     const file = fixtureFile();
     writeFileSync(file, JSON.stringify(metadata));
     expect(
-      ngrvDetector({ file: pathToFileURL(file) }).detect().attributes[
+      birthplaceDetector({ file: pathToFileURL(file) }).detect().attributes[
         "vcs.ref.head.revision"
       ],
     ).toBe("a".repeat(40));
@@ -60,27 +60,30 @@ describe("ngrvDetector", () => {
     const file = fixtureFile();
     writeFileSync(file, JSON.stringify(metadata));
     expect(
-      ngrvDetector({ file, includeCustomAttributes: true }).detect().attributes,
+      birthplaceDetector({ file, includeCustomAttributes: true }).detect()
+        .attributes,
     ).toEqual({
       "service.name": "payments",
       "service.version": "4.5.6",
       "vcs.ref.head.revision": "a".repeat(40),
       "cicd.pipeline.run.url.full": "https://ci.example.test/builds/42",
-      "ngrv.source.dirty": false,
-      "ngrv.build.timestamp": "2026-09-21T01:02:03.000Z",
-      "ngrv.build.timestamp_source": "explicit",
+      "birthplace.source.dirty": false,
+      "birthplace.build.timestamp": "2026-09-21T01:02:03.000Z",
+      "birthplace.build.timestamp_source": "explicit",
     });
   });
 
-  it("resolves its default artifact against the directory at factory creation", () => {
-    const directory = mkdtempSync(join(tmpdir(), "ngrv-default-detector-"));
+  it("resolves its default birthplace file against the directory at factory creation", () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), "birthplace-default-detector-"),
+    );
     directories.push(directory);
-    writeFileSync(join(directory, "build-info.json"), JSON.stringify(metadata));
+    writeFileSync(join(directory, "birthplace.json"), JSON.stringify(metadata));
     const originalDirectory = process.cwd();
-    let detector: ReturnType<typeof ngrvDetector>;
+    let detector: ReturnType<typeof birthplaceDetector>;
     try {
       process.chdir(directory);
-      detector = ngrvDetector();
+      detector = birthplaceDetector();
     } finally {
       process.chdir(originalDirectory);
     }
@@ -88,9 +91,13 @@ describe("ngrvDetector", () => {
   });
 
   it.each([
-    ["missing file", undefined, "NGRV_READ_ERROR"],
-    ["malformed JSON", "{", "NGRV_READ_ERROR"],
-    ["unsupported schema", '{"schemaVersion":99}', "NGRV_VALIDATION_ERROR"],
+    ["missing file", undefined, "BIRTHPLACE_READ_ERROR"],
+    ["malformed JSON", "{", "BIRTHPLACE_READ_ERROR"],
+    [
+      "unsupported schema",
+      '{"schemaVersion":99}',
+      "BIRTHPLACE_VALIDATION_ERROR",
+    ],
   ])(
     "reports %s without falling back to runtime collection",
     (_name, contents, code) => {
@@ -98,12 +105,12 @@ describe("ngrvDetector", () => {
       if (contents !== undefined) {
         writeFileSync(file, contents);
       }
-      const detector = ngrvDetector({ file });
-      expect(() => detector.detect()).toThrow(NgrvError);
+      const detector = birthplaceDetector({ file });
+      expect(() => detector.detect()).toThrow(BirthplaceError);
       try {
         detector.detect();
       } catch (error) {
-        expect((error as NgrvError).code).toBe(code);
+        expect((error as BirthplaceError).code).toBe(code);
       }
     },
   );
