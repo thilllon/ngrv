@@ -668,6 +668,7 @@ describe("BuildInfo validation and storage", () => {
       "credentialed URL",
       {
         ...completeInfo,
+        // trufflehog:ignore
         build: { url: "https://user:password@example.test/build" },
       },
     ],
