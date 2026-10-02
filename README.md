@@ -34,6 +34,26 @@ pnpm exec birthplace generate --cwd . --output dist/birthplace.json --strict
 The birthplace file describes the build. Do not add deployment environment or deployment time to it;
 those values change independently of the immutable artifact.
 
+### Where to run it
+
+Run one `birthplace generate` call from the `build` script in `package.json`, chained explicitly:
+after the compiler when the file is read at runtime, before the bundler when it is imported.
+
+```json
+{ "scripts": { "build": "tsc && birthplace generate --output dist/birthplace.json" } }
+```
+
+Do not rely on `prebuild` / `postbuild` scripts; not every package manager version or platform runs
+them. The [platform guides](docs/platforms.md) cover the details:
+
+| Platform                                                                             | What to know                                                                         |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| [GitHub Actions](docs/platforms.md#github-actions)                                   | No workflow change; pull-request builds record a temporary merge commit              |
+| [Vercel](docs/platforms.md#vercel)                                                   | Expose system environment variables; prefer the import-based setup                   |
+| [Docker](docs/platforms.md#docker)                                                   | Generate in the build stage, `COPY` into the runtime stage; `.git` is often excluded |
+| [Turborepo and other task caches](docs/platforms.md#turborepo-and-other-task-caches) | A cache hit restores a birthplace file from an older commit                          |
+| [OpenTelemetry SDK](docs/platforms.md#opentelemetry-sdk-behavior)                    | `resourceDetectors` replaces the defaults; a failing detector is skipped silently    |
+
 ### Register the detector in NodeSDK()
 
 Install the OpenTelemetry SDK pieces used by your application. birthplace supplies the resource
