@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
@@ -104,7 +104,15 @@ Module._load = function (request, parent, isMain) {
 const otel = require('birthplace/otel');
 assert.deepEqual(otel.toOtelAttributes({ schemaVersion: 1, service: { name: 'cjs' }, source: {}, build: {} }), { 'service.name': 'cjs' });
 assert.equal(typeof otel.birthplaceDetector, 'function');
+Module._load = function (request, parent, isMain) {
+  if (request.startsWith('node:') || Module.builtinModules.includes(request)) throw new Error('birthplace/attributes loaded ' + request);
+  return originalLoad.apply(this, arguments);
+};
+const attributes = require('birthplace/attributes');
+assert.deepEqual(attributes.toOtelAttributes({ schemaVersion: 1, service: { name: 'cjs' }, source: {}, build: {} }), { 'service.name': 'cjs' });
+assert.deepEqual(Object.keys(attributes).sort(), ['BirthplaceError', 'toOtelAttributes']);
 Module._load = originalLoad;
+assert.deepEqual(otel.birthplaceDetector({ info: { schemaVersion: 1, service: { name: 'object' }, source: {}, build: {} } }).detect().attributes, { 'service.name': 'object' });
 const root = require('birthplace');
 assert.equal(typeof root.collectBirthplace, 'function');
 assert.equal(root.validateBirthplace, undefined);
@@ -120,6 +128,9 @@ import assert from 'node:assert/strict';
 import * as root from 'birthplace';
 import { collectBirthplace } from 'birthplace';
 import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';
+import * as attributes from 'birthplace/attributes';
+assert.deepEqual(Object.keys(attributes).sort(), ['BirthplaceError', 'toOtelAttributes']);
+assert.deepEqual(attributes.toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, source: {}, build: {} }), { 'service.name': 'esm' });
 assert.equal(typeof collectBirthplace, 'function');
 assert.equal('validateBirthplace' in root, false);
 assert.equal('engrave' in root, false);
@@ -146,6 +157,41 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
   )) {
     run(process.execPath, [join(installedPackageDirectory, target), "--help"]);
   }
+
+  // birthplace/attributes must stay usable without Node.js built-ins: walk the built
+  // import graph of both formats and reject anything that is not a relative module.
+  const builtinFreeGraph = (entry: string): string[] => {
+    const visited = new Set<string>();
+    const pending = [join(installedPackageDirectory, entry)];
+    for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
+      if (visited.has(file)) {
+        continue;
+      }
+      visited.add(file);
+      const source = readFileSync(file, "utf8");
+      assert.doesNotMatch(source, /node:/, `${file} mentions node:`);
+      const specifiers = [
+        ...source.matchAll(
+          /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(["'])([^"']+)\1/g,
+        ),
+      ].map((match) => match[2]);
+      for (const specifier of specifiers) {
+        assert.match(
+          specifier,
+          /^\.\.?\//,
+          `${file} imports the non-relative module ${specifier}`,
+        );
+        pending.push(resolve(dirname(file), specifier));
+      }
+    }
+    return [...visited];
+  };
+  for (const entry of ["dist/attributes.mjs", "dist/attributes.cjs"]) {
+    assert.ok(builtinFreeGraph(entry).length >= 1);
+  }
+  // The same walker must notice the built-ins that the Node-only entry does load.
+  assert.throws(() => builtinFreeGraph("dist/otel.mjs"), /node:/);
+  assert.throws(() => builtinFreeGraph("dist/otel.cjs"), /node:/);
 
   const birthplaceFile = join(consumerDirectory, "birthplace.json");
   run(join(binDirectory, `birthplace${executableSuffix}`), [
@@ -177,6 +223,14 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
     join(installedPackageDirectory, "dist/cli.cjs"),
     join(installedPackageDirectory, "dist/otel.cjs"),
   ]);
+  run(process.execPath, [
+    "--import",
+    import.meta.resolve("tsx"),
+    join(repository, "scripts/node-sdk-smoke.mts"),
+    join(installedPackageDirectory, "dist/cli.cjs"),
+    join(installedPackageDirectory, "dist/otel.cjs"),
+    "--info",
+  ]);
 
   const moduleFile = join(consumerDirectory, "birthplace.mjs");
   run(join(binDirectory, `birthplace${executableSuffix}`), [
@@ -206,7 +260,7 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
 
   writeFileSync(
     join(consumerDirectory, "types.ts"),
-    `import { collectBirthplace, type Birthplace } from 'birthplace';\nimport { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nconst info: Birthplace = collectBirthplace({ timestamp: false });\ntoOtelAttributes(info);\nbirthplaceDetector({ file: new URL('file:///app/birthplace.json') }).detect();\n`,
+    `import { collectBirthplace, type Birthplace } from 'birthplace';\nimport { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nconst info: Birthplace = collectBirthplace({ timestamp: false });\ntoOtelAttributes(info);\nbirthplaceDetector({ file: new URL('file:///app/birthplace.json') }).detect();\nbirthplaceDetector({ info }).detect();\nimport { toOtelAttributes as map, BirthplaceError, type Birthplace as Info, type OtelAttributes } from 'birthplace/attributes';\nconst mapped: OtelAttributes = map(info as Info);\nvoid [mapped, BirthplaceError];\n`,
   );
   writeFileSync(
     join(consumerDirectory, "types.mts"),

@@ -53,6 +53,16 @@
         "default": "./dist/otel.cjs"
       }
     },
+    "./attributes": {
+      "import": {
+        "types": "./dist/attributes.d.mts",
+        "default": "./dist/attributes.mjs"
+      },
+      "require": {
+        "types": "./dist/attributes.d.cts",
+        "default": "./dist/attributes.cjs"
+      }
+    },
     "./package.json": "./package.json"
   },
   "bin": {
