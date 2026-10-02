@@ -26,12 +26,14 @@ export const birthplaceDetector = (
       ? fileURLToPath(options.file)
       : (options.file ?? "birthplace.json"),
   );
-  const { includeCustomAttributes = false } = options;
+  const { includeCustomAttributes = false, includeHostAttributes = false } =
+    options;
 
   return {
     detect: () => ({
       attributes: toOtelAttributes(readBirthplace(file), {
         includeCustomAttributes,
+        includeHostAttributes,
       }),
     }),
   };

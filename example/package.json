@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build:metadata": "birthplace generate --cwd . --output birthplace.json --strict",
+    "build:metadata": "birthplace generate --cwd . --output birthplace.json --strict --host",
     "start": "node src/index.mjs",
     "test": "pnpm build:metadata && pnpm start"
   },

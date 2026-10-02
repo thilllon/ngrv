@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Birthplace, validateBirthplace } from "./birthplace";
 import { BirthplaceError } from "./errors";
+import { collectHost } from "./host";
 
 export interface CollectBirthplaceOptions {
   cwd?: string;
@@ -14,6 +15,12 @@ export interface CollectBirthplaceOptions {
   buildUrl?: string;
   timestamp?: string | false;
   strict?: boolean;
+  /**
+   * Record the build machine (architecture, CPU model and logical count, total memory,
+   * endianness) in the host group. Defaults to false because machine facts make the
+   * birthplace file differ between otherwise identical builds.
+   */
+  host?: boolean;
 }
 
 interface PackageIdentity {
@@ -229,6 +236,7 @@ export const collectBirthplace = (
         ...(dirty === undefined ? {} : { dirty }),
       },
       build,
+      ...(options.host ? { host: collectHost() } : {}),
     });
 
     if (
