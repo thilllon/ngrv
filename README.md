@@ -116,13 +116,35 @@ A JSON artifact has this shape; unavailable optional fields are omitted:
 `collectBuildInfo(options)` discovers values with these exact precedence rules:
 
 - Service name and version: explicit `name` / `version`, then `cwd/package.json`.
-- Source revision: explicit `revision`, then the checkout's Git `HEAD`, then a recognized GitHub
-  Actions or GitLab CI revision.
+- Source revision: explicit `revision`, then the checkout's Git `HEAD`, then the recognized
+  provider's revision.
 - Dirty state: explicit `dirty`, then the checkout's Git status. It stays absent when Git cannot
   determine it; NGRV never assumes that a checkout is clean.
 - CI pipeline run URL: explicit `buildUrl`, then the recognized CI provider's run URL.
 - Timestamp: `timestamp: false` omits it; an explicit ISO timestamp wins over `SOURCE_DATE_EPOCH`;
   a valid `SOURCE_DATE_EPOCH` wins over the collection clock.
+
+Provider values are a fallback only, and exactly one provider is used. The first matching marker
+wins; values from different providers are never mixed:
+
+| Order | Provider       | Marker                | Revision                | Run URL                                                                |
+| ----- | -------------- | --------------------- | ----------------------- | ---------------------------------------------------------------------- |
+| 1     | GitHub Actions | `GITHUB_ACTIONS=true` | `GITHUB_SHA`            | `<GITHUB_SERVER_URL>/<GITHUB_REPOSITORY>/actions/runs/<GITHUB_RUN_ID>` |
+| 2     | GitLab CI      | `GITLAB_CI=true`      | `CI_COMMIT_SHA`         | `CI_PIPELINE_URL`                                                      |
+| 3     | Vercel         | `VERCEL=1`            | `VERCEL_GIT_COMMIT_SHA` | `https://<VERCEL_URL>/_logs`                                           |
+
+On Vercel the checkout is often unavailable: `vercel deploy` source uploads do not include `.git`,
+and a monorepo Root Directory can hide it. The fallback needs Vercel's
+[system environment variables](https://vercel.com/docs/environment-variables/system-environment-variables),
+so enable **Automatically expose System Environment Variables** in the project's Environment
+Variables settings. `VERCEL_GIT_COMMIT_SHA` is only populated for deployments created from a
+connected Git repository; an empty value is treated as unknown, so `--strict` still fails instead
+of recording a guess. `VERCEL_URL` is a bare hostname without a scheme, and the run URL points at
+that deployment's build logs. A `VERCEL_URL` that is empty or not a plain hostname is ignored. The
+Vercel URL is stored in `build.url` and still maps to `cicd.pipeline.run.url.full`.
+
+GitHub Actions and GitLab CI are checked before Vercel because a `vercel build` executed inside a
+CI job keeps `VERCEL=1` while the CI provider is the machine that ran the build.
 
 `SOURCE_DATE_EPOCH` is interpreted as UTC Unix seconds and produces
 `timestampSource: "source-date-epoch"`. Explicit values use `"explicit"`, and the current clock uses

@@ -114,6 +114,26 @@ const readGitIdentity = (cwd: string): GitIdentity => {
   }
 };
 
+// VERCEL_URL is a bare deployment hostname without a scheme. Anything else
+// (a path, port, credentials, or whitespace) is not a value Vercel produces.
+const HOSTNAME_PATTERN =
+  /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i;
+
+const readVercelIdentity = (
+  env: Readonly<Record<string, string | undefined>>,
+): ProviderIdentity => {
+  // Vercel defines its Git variables as empty strings for deployments that
+  // have no Git metadata, so an empty value means "unknown" here.
+  const revision = env.VERCEL_GIT_COMMIT_SHA;
+  const host = env.VERCEL_URL;
+  return {
+    ...(revision ? { revision } : {}),
+    ...(host && HOSTNAME_PATTERN.test(host)
+      ? { buildUrl: `https://${host}/_logs` }
+      : {}),
+  };
+};
+
 const readProviderIdentity = (
   env: Readonly<Record<string, string | undefined>>,
 ): ProviderIdentity => {
@@ -140,6 +160,12 @@ const readProviderIdentity = (
         ? {}
         : { buildUrl: env.CI_PIPELINE_URL }),
     };
+  }
+
+  // Checked last: a `vercel build` inside another CI provider keeps VERCEL=1,
+  // but the machine that ran the build is the CI provider's.
+  if (env.VERCEL === "1") {
+    return readVercelIdentity(env);
   }
 
   return {};

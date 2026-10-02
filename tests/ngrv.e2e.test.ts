@@ -24,6 +24,7 @@ const runCli = (...args: string[]) =>
       ...process.env,
       GITHUB_ACTIONS: "false",
       GITLAB_CI: "false",
+      VERCEL: "0",
       SOURCE_DATE_EPOCH: undefined,
     },
   });
