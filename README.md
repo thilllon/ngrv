@@ -11,8 +11,7 @@ Git in production.
 
 **Build CLI → birthplace.json → deployment package → NodeSDK.resourceDetectors**
 
-Tested on Node.js 22 and 24 with OpenTelemetry Resources 2.x. Coming from `ngrv`? See
-[Migrating from ngrv](#migrating-from-ngrv).
+Tested on Node.js 22 and 24 with OpenTelemetry Resources 2.x.
 
 ## Usage
 
@@ -409,35 +408,6 @@ npx birthplace inspect dist/birthplace.json --otel --include-host-attributes
 
 Malformed data, invalid options, missing strict fields, and filesystem failures print a concise error
 to stderr and exit nonzero.
-
-## Migrating from ngrv
-
-birthplace replaces the `ngrv` package. It is a new package name with a renamed API, CLI, and
-generated file; there is no compatibility alias.
-
-| ngrv                                     | birthplace                                                                                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `ngrv` package                           | `birthplace` package                                                                                          |
-| `ngrv/otel`                              | `birthplace/otel`                                                                                             |
-| `.ngrv` file and `NGRV_*` variables      | Removed; opt-in [build machine](#build-machine) capture with `--host` records hardware facts only             |
-| `ngrv create` / `ngrv read`              | `birthplace generate` / `birthplace inspect`                                                                  |
-| `build-info.json`                        | `birthplace.json`                                                                                             |
-| `ngrvDetector`                           | `birthplaceDetector`                                                                                          |
-| `--name`                                 | `--service-name`                                                                                              |
-| `--include-custom`                       | `--include-custom-attributes`                                                                                 |
-| `BuildInfo`                              | `Birthplace`                                                                                                  |
-| `collectBuildInfo` / `readBuildInfo`     | `collectBirthplace` / `readBirthplace`                                                                        |
-| `writeBuildInfo`                         | `writeBirthplace`                                                                                             |
-| `validateBuildInfo`                      | Not exported; `readBirthplace`, `writeBirthplace`, and `toOtelAttributes` validate their input                |
-| `NgrvError` with `NGRV_*_ERROR` codes    | `BirthplaceError` with `BIRTHPLACE_*_ERROR` codes                                                             |
-| `ngrv.source.dirty`, `ngrv.build.*`      | `birthplace.source.dirty`, `birthplace.build.timestamp`, `birthplace.build.timestamp_source`                  |
-| Named `buildInfo` export of the ESM file | Default export only                                                                                           |
-| `engrave()` / `readEngrave()`            | `collectBirthplace` plus `writeBirthplace` at build time; `readBirthplace` or `birthplaceDetector` at runtime |
-
-An old `.ngrv` file is not a valid birthplace file: regenerate it during the build with
-`birthplace generate --output dist/birthplace.json --strict` instead of renaming it, and copy the
-result into the runtime package. A JSON `build-info.json` uses the same schema (`schemaVersion: 1`),
-so only its file name changes. birthplace never mutates `process.env`.
 
 ## Development
 

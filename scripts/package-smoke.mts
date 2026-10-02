@@ -123,6 +123,25 @@ try {
     "--no-frozen-lockfile",
   ]);
 
+  // The exact public surface of every entry point, sorted. Any export that is added or
+  // dropped without updating these lists fails the installed-consumer check.
+  const rootExports = JSON.stringify([
+    "BirthplaceError",
+    "birthplaceDetector",
+    "collectBirthplace",
+    "readBirthplace",
+    "toOtelAttributes",
+    "writeBirthplace",
+  ]);
+  const otelExports = JSON.stringify([
+    "birthplaceDetector",
+    "toOtelAttributes",
+  ]);
+  const attributesExports = JSON.stringify([
+    "BirthplaceError",
+    "toOtelAttributes",
+  ]);
+
   const commonJs = `
 const assert = require('assert/strict');
 const Module = require('module');
@@ -140,16 +159,13 @@ Module._load = function (request, parent, isMain) {
 };
 const attributes = require('birthplace/attributes');
 assert.deepEqual(attributes.toOtelAttributes({ schemaVersion: 1, service: { name: 'cjs' }, source: {}, build: {} }), { 'service.name': 'cjs' });
-assert.deepEqual(Object.keys(attributes).sort(), ['BirthplaceError', 'toOtelAttributes']);
+assert.deepEqual(Object.keys(attributes).sort(), ${attributesExports});
 Module._load = originalLoad;
 assert.deepEqual(otel.birthplaceDetector({ info: { schemaVersion: 1, service: { name: 'object' }, source: {}, build: {} } }).detect().attributes, { 'service.name': 'object' });
 const root = require('birthplace');
 assert.equal(typeof root.collectBirthplace, 'function');
-assert.equal(root.collectHost, undefined);
-assert.equal(root.validateBirthplace, undefined);
-assert.equal(otel.validateBirthplace, undefined);
-assert.equal(root.engrave, undefined);
-assert.equal(root.readEngrave, undefined);
+assert.deepEqual(Object.keys(root).sort(), ${rootExports});
+assert.deepEqual(Object.keys(otel).sort(), ${otelExports});
 `;
   writeFileSync(join(consumerDirectory, "commonjs.cjs"), commonJs);
   run(process.execPath, ["commonjs.cjs"]);
@@ -158,15 +174,14 @@ assert.equal(root.readEngrave, undefined);
 import assert from 'node:assert/strict';
 import * as root from 'birthplace';
 import { collectBirthplace } from 'birthplace';
+import * as otel from 'birthplace/otel';
 import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';
 import * as attributes from 'birthplace/attributes';
-assert.deepEqual(Object.keys(attributes).sort(), ['BirthplaceError', 'toOtelAttributes']);
+assert.deepEqual(Object.keys(attributes).sort(), ${attributesExports});
 assert.deepEqual(attributes.toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, source: {}, build: {} }), { 'service.name': 'esm' });
 assert.equal(typeof collectBirthplace, 'function');
-assert.equal('validateBirthplace' in root, false);
-assert.equal('collectHost' in root, false);
-assert.equal('engrave' in root, false);
-assert.equal('readEngrave' in root, false);
+assert.deepEqual(Object.keys(root).sort(), ${rootExports});
+assert.deepEqual(Object.keys(otel).sort(), ${otelExports});
 assert.equal(typeof birthplaceDetector, 'function');
 assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, source: {}, build: {} }), { 'service.name': 'esm' });
 `;
@@ -346,7 +361,8 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
 
   writeFileSync(
     join(consumerDirectory, "types.ts"),
-    `import { collectBirthplace, type Birthplace, type BirthplaceHost } from 'birthplace';\nimport { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nconst info: Birthplace = collectBirthplace({ timestamp: false, host: true });\nconst host: BirthplaceHost | undefined = info.host;\nconst count: number | undefined = host?.cpu?.logical?.count;\nconst value: string | number | boolean = toOtelAttributes(info, { includeHostAttributes: true })['birthplace.host.memory.total'];\nbirthplaceDetector({ file: new URL('file:///app/birthplace.json'), includeHostAttributes: true }).detect();\nbirthplaceDetector({ info, includeHostAttributes: true }).detect();\nimport { toOtelAttributes as map, BirthplaceError, type Birthplace as Info, type OtelAttributes } from 'birthplace/attributes';\nconst mapped: OtelAttributes = map(info as Info, { includeHostAttributes: true });\nvoid [mapped, BirthplaceError];\nexport { count, value };\n`,
+    `import { collectBirthplace, type Birthplace, type BirthplaceHost } from 'birthplace';\nimport * as otel from 'birthplace/otel';
+import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nconst info: Birthplace = collectBirthplace({ timestamp: false, host: true });\nconst host: BirthplaceHost | undefined = info.host;\nconst count: number | undefined = host?.cpu?.logical?.count;\nconst value: string | number | boolean = toOtelAttributes(info, { includeHostAttributes: true })['birthplace.host.memory.total'];\nbirthplaceDetector({ file: new URL('file:///app/birthplace.json'), includeHostAttributes: true }).detect();\nbirthplaceDetector({ info, includeHostAttributes: true }).detect();\nimport { toOtelAttributes as map, BirthplaceError, type Birthplace as Info, type OtelAttributes } from 'birthplace/attributes';\nconst mapped: OtelAttributes = map(info as Info, { includeHostAttributes: true });\nvoid [mapped, BirthplaceError];\nexport { count, value };\n`,
   );
   writeFileSync(
     join(consumerDirectory, "types.mts"),
@@ -374,7 +390,8 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
   // pass it on without a cast. The file's JSDoc annotation is what makes this compile.
   writeFileSync(
     join(consumerDirectory, "imported.mts"),
-    `import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nimport { toOtelAttributes as map } from 'birthplace/attributes';\nimport type { Birthplace } from 'birthplace';\nimport birthplace from './birthplace.mjs';\nconst typed: Birthplace = birthplace;\nbirthplaceDetector({ info: birthplace }).detect();\nvoid [toOtelAttributes(birthplace), map(birthplace), typed];\n`,
+    `import * as otel from 'birthplace/otel';
+import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nimport { toOtelAttributes as map } from 'birthplace/attributes';\nimport type { Birthplace } from 'birthplace';\nimport birthplace from './birthplace.mjs';\nconst typed: Birthplace = birthplace;\nbirthplaceDetector({ info: birthplace }).detect();\nvoid [toOtelAttributes(birthplace), map(birthplace), typed];\n`,
   );
   execFileSync(
     process.execPath,

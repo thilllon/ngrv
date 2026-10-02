@@ -271,22 +271,24 @@ describe("built CLI", () => {
     expect(result.stderr).not.toBe("");
   });
 
-  it.each(["create", "c", "read", "r"])(
-    "rejects the removed legacy %s command without writing a birthplace file",
-    (command) => {
-      const directory = join(temporaryDirectory, `removed-${command}`);
-      mkdirSync(directory);
+  it.each([
+    ["an unknown command", ["frobnicate"]],
+    ["an unknown command with options", ["frobnicate", "--cwd", "."]],
+    ["an extra positional argument", ["generate", "frobnicate"]],
+  ])("rejects %s without writing anything", (_label, args) => {
+    const directory = join(
+      temporaryDirectory,
+      `rejected-${args.length}-${args[0]}`,
+    );
+    mkdirSync(directory);
 
-      for (const args of [[command], [command, "-d", "."]]) {
-        const result = spawnSync(process.execPath, [cli, ...args], {
-          cwd: directory,
-          encoding: "utf8",
-        });
+    const result = spawnSync(process.execPath, [cli, ...args], {
+      cwd: directory,
+      encoding: "utf8",
+    });
 
-        expect(result.status).not.toBe(0);
-        expect(result.stderr).not.toBe("");
-      }
-      expect(readdirSync(directory)).toEqual([]);
-    },
-  );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).not.toBe("");
+    expect(readdirSync(directory)).toEqual([]);
+  });
 });
