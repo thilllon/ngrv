@@ -19,6 +19,17 @@ export interface WriteBirthplaceOptions {
 const jsonSource = (info: Birthplace): string =>
   `${JSON.stringify(info, null, 2)}\n`;
 
+// The JSDoc annotation keeps TypeScript (with `allowJs`) from widening the literal: without it
+// `schemaVersion` is inferred as `number` and the import is not assignable to `Birthplace`.
+const esmSource = (info: Birthplace): string =>
+  [
+    "/** @type {import('birthplace').Birthplace} */",
+    `const birthplace = ${JSON.stringify(info, null, 2)};`,
+    "",
+    "export default birthplace;",
+    "",
+  ].join("\n");
+
 export const writeBirthplace = (
   value: Birthplace,
   options: WriteBirthplaceOptions = {},
@@ -30,10 +41,7 @@ export const writeBirthplace = (
   );
   const directory = dirname(file);
   const temporaryFile = `${file}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-  const source =
-    format === "esm"
-      ? `export default ${JSON.stringify(info, null, 2)};\n`
-      : jsonSource(info);
+  const source = format === "esm" ? esmSource(info) : jsonSource(info);
 
   try {
     mkdirSync(directory, { recursive: true });

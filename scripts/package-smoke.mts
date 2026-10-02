@@ -284,6 +284,30 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
     { cwd: consumerDirectory, stdio: "pipe" },
   );
 
+  // The documented TypeScript path: import the generated ESM birthplace file with `allowJs` and
+  // pass it on without a cast. The file's JSDoc annotation is what makes this compile.
+  writeFileSync(
+    join(consumerDirectory, "imported.mts"),
+    `import { toOtelAttributes, birthplaceDetector } from 'birthplace/otel';\nimport { toOtelAttributes as map } from 'birthplace/attributes';\nimport type { Birthplace } from 'birthplace';\nimport birthplace from './birthplace.mjs';\nconst typed: Birthplace = birthplace;\nbirthplaceDetector({ info: birthplace }).detect();\nvoid [toOtelAttributes(birthplace), map(birthplace), typed];\n`,
+  );
+  execFileSync(
+    process.execPath,
+    [
+      join(repository, "node_modules", "typescript", "bin", "tsc"),
+      "--noEmit",
+      "--strict",
+      "--allowJs",
+      "--module",
+      "node16",
+      "--moduleResolution",
+      "node16",
+      "--target",
+      "es2020",
+      "imported.mts",
+    ],
+    { cwd: consumerDirectory, stdio: "pipe" },
+  );
+
   assert.equal(
     JSON.parse(readFileSync(birthplaceFile, "utf8")).schemaVersion,
     1,

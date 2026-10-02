@@ -718,6 +718,18 @@ describe("Birthplace validation and storage", () => {
     expect(imported).toEqual({ keys: ["default"], value: completeInfo });
   });
 
+  it("annotates the ESM module with the Birthplace type for TypeScript consumers", () => {
+    const directory = makeTemporaryDirectory();
+    const file = join(directory, "metadata.mjs");
+    writeBirthplace(completeInfo, { file, format: "esm" });
+
+    const source = readFileSync(file, "utf8");
+    expect(
+      source.startsWith("/** @type {import('birthplace').Birthplace} */\n"),
+    ).toBe(true);
+    expect(source.endsWith("\nexport default birthplace;\n")).toBe(true);
+  });
+
   it("keeps the validator out of the public entry points", () => {
     expect("validateBirthplace" in publicApi).toBe(false);
     expect("validateBirthplace" in otelApi).toBe(false);

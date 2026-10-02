@@ -130,8 +130,16 @@ sdk.start();
 validated during `detect()`, exactly like a file. Passing both `file` and `info` throws a
 `BirthplaceError` with code `BIRTHPLACE_VALIDATION_ERROR` when the detector is created, so that
 mistake is not swallowed by OpenTelemetry. The generated file is build output: add
-`src/birthplace.mjs` to `.gitignore`. TypeScript projects need `allowJs` or a declaration next to
-the file to import it.
+`src/birthplace.mjs` to `.gitignore`.
+
+TypeScript projects need `allowJs` to import the file. It carries a
+`/** @type {import('birthplace').Birthplace} */` annotation, so the import is typed as `Birthplace`
+and needs no cast. Without `allowJs`, put a declaration next to it instead (`src/birthplace.d.mts`):
+
+```ts
+declare const birthplace: import('birthplace').Birthplace;
+export default birthplace;
+```
 
 `birthplace/otel` requires Node.js: it loads `node:fs`, `node:path`, `node:url`, and `node:crypto`
 when imported, even if only `info` is used. For a runtime or bundle without Node.js built-ins, import
