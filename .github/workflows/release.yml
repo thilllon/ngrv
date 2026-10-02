@@ -1,4 +1,4 @@
-# The ngrv npm trusted publisher is registered with this workflow
+# The birthplace npm trusted publisher is registered with this workflow
 # filename. Never rename or move this file. Publication runs here or in a
 # reusable workflow called from here; npm checks the calling workflow file.
 name: Release
@@ -52,7 +52,11 @@ jobs:
             pnpm install --lockfile-only --ignore-scripts
             pnpm format
           fi
-          git add .changeset package.json CHANGELOG.md pnpm-lock.yaml
+          git add .changeset package.json pnpm-lock.yaml
+          # Changesets creates CHANGELOG.md at the first release; it is absent before that.
+          if [ -e CHANGELOG.md ]; then
+            git add CHANGELOG.md
+          fi
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -65,13 +69,13 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch --force-create automation/releases
-          git commit --message 'chore(release): version ngrv'
+          git commit --message 'chore(release): version birthplace'
           git push --force-with-lease origin automation/releases
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
           pr=$(gh pr list --head automation/releases --base main --state open --json number --jq '.[0].number // empty')
           if [ -z "$pr" ]; then
-            gh pr create --head automation/releases --base main --title 'chore(release): version ngrv' --body 'Automated Changesets version updates. The release workflow runs full CI against this exact commit before merging. npm publishing remains disabled until NPM_PUBLISH_ENABLED=true.'
+            gh pr create --head automation/releases --base main --title 'chore(release): version birthplace' --body 'Automated Changesets version updates. The release workflow runs full CI against this exact commit before merging. npm publishing remains disabled until NPM_PUBLISH_ENABLED=true.'
             pr=$(gh pr list --head automation/releases --base main --state open --json number --jq '.[0].number')
           fi
           echo "pr=$pr" >> "$GITHUB_OUTPUT"

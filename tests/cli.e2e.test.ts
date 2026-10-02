@@ -31,7 +31,7 @@ const runCli = (...args: string[]) =>
   });
 
 beforeAll(() => {
-  temporaryDirectory = mkdtempSync(join(tmpdir(), "ngrv-cli-"));
+  temporaryDirectory = mkdtempSync(join(tmpdir(), "birthplace-cli-"));
   fixture = join(temporaryDirectory, "fixture");
   mkdirSync(fixture);
   writeFileSync(
@@ -46,14 +46,18 @@ afterAll(() => {
 
 describe("built CLI", () => {
   it("generates metadata and inspects it as OpenTelemetry attributes", () => {
-    const artifact = join(temporaryDirectory, "nested", "build-info.json");
+    const birthplaceFile = join(
+      temporaryDirectory,
+      "nested",
+      "birthplace.json",
+    );
     const generated = runCli(
       "generate",
       "--cwd",
       fixture,
       "--output",
-      artifact,
-      "--name",
+      birthplaceFile,
+      "--service-name",
       "demo",
       "--service-version",
       "2.0.0",
@@ -65,14 +69,14 @@ describe("built CLI", () => {
 
     expect(generated.status).toBe(0);
     expect(generated.stderr).toBe("");
-    expect(JSON.parse(readFileSync(artifact, "utf8"))).toEqual({
+    expect(JSON.parse(readFileSync(birthplaceFile, "utf8"))).toEqual({
       schemaVersion: 1,
       service: { name: "demo", version: "2.0.0" },
       source: { revision },
       build: {},
     });
 
-    const inspected = runCli("inspect", artifact, "--otel");
+    const inspected = runCli("inspect", birthplaceFile, "--otel");
     expect(inspected.status).toBe(0);
     expect(inspected.stderr).toBe("");
     expect(JSON.parse(inspected.stdout)).toEqual({
@@ -82,7 +86,7 @@ describe("built CLI", () => {
     });
   });
 
-  it("uses JSON generation as the bare v4 command", () => {
+  it("uses JSON generation as the bare command", () => {
     const result = runCli(
       "--cwd",
       fixture,
@@ -95,7 +99,7 @@ describe("built CLI", () => {
     expect(result.stderr).toBe("");
     expect(
       JSON.parse(
-        readFileSync(join(temporaryDirectory, "build-info.json"), "utf8"),
+        readFileSync(join(temporaryDirectory, "birthplace.json"), "utf8"),
       ),
     ).toEqual({
       schemaVersion: 1,
@@ -117,7 +121,12 @@ describe("built CLI", () => {
       }),
     );
     const standard = runCli("inspect", file, "--otel");
-    const custom = runCli("inspect", file, "--otel", "--include-custom");
+    const custom = runCli(
+      "inspect",
+      file,
+      "--otel",
+      "--include-custom-attributes",
+    );
     expect(standard.status).toBe(0);
     expect(custom.status).toBe(0);
     expect(JSON.parse(standard.stdout)).toEqual({
@@ -125,18 +134,18 @@ describe("built CLI", () => {
     });
     expect(JSON.parse(custom.stdout)).toEqual({
       "vcs.ref.head.revision": revision,
-      "ngrv.source.dirty": false,
+      "birthplace.source.dirty": false,
     });
   });
 
   it("writes an importable ESM metadata module", () => {
-    const artifact = join(temporaryDirectory, "build-info.mjs");
+    const birthplaceFile = join(temporaryDirectory, "birthplace.mjs");
     const generated = runCli(
       "generate",
       "--cwd",
       fixture,
       "--output",
-      artifact,
+      birthplaceFile,
       "--format",
       "esm",
       "--revision",
@@ -153,7 +162,7 @@ describe("built CLI", () => {
         "--input-type=module",
         "--eval",
         `import(${JSON.stringify(
-          pathToFileURL(artifact).href,
+          pathToFileURL(birthplaceFile).href,
         )}).then(({default: value}) => console.log(JSON.stringify(value)))`,
       ],
       { encoding: "utf8" },
@@ -178,10 +187,10 @@ describe("built CLI", () => {
   });
 
   it("returns a nonzero status for malformed input", () => {
-    const artifact = join(temporaryDirectory, "malformed.json");
-    writeFileSync(artifact, "{");
+    const birthplaceFile = join(temporaryDirectory, "malformed.json");
+    writeFileSync(birthplaceFile, "{");
 
-    const result = runCli("inspect", artifact);
+    const result = runCli("inspect", birthplaceFile);
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).not.toBe("");
@@ -206,7 +215,7 @@ describe("built CLI", () => {
   });
 
   it.each(["create", "c", "read", "r"])(
-    "rejects the removed legacy %s command without writing an artifact",
+    "rejects the removed legacy %s command without writing a birthplace file",
     (command) => {
       const directory = join(temporaryDirectory, `removed-${command}`);
       mkdirSync(directory);

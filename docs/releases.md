@@ -1,14 +1,14 @@
 # Release automation
 
-NGRV follows the Changesets and npm trusted-publishing workflow used by
+birthplace follows the Changesets and npm trusted-publishing workflow used by
 [nestjs-kit](https://github.com/thilllon/nestjs-kit). Changesets is the only
-versioning and publishing engine. The root `ngrv` package is explicitly included
+versioning and publishing engine. The root `birthplace` package is explicitly included
 in `pnpm-workspace.yaml`; `example` is private and is never published.
 
 ## From a change to npm
 
 1. Open an issue and implement a PR with a Changeset for publishable changes.
-   Run `pnpm changeset`, select `ngrv` and describe the user-facing change.
+   Run `pnpm changeset`, select `birthplace` and describe the user-facing change.
    Use major for breaking APIs or runtime requirements, minor for compatible
    features and patch for compatible fixes. Documentation-only changes need none.
 2. After the checked PR merges, Release checks out its immutable event SHA.
@@ -39,24 +39,35 @@ validation and signed provenance all refer to the commit used to build the archi
 
 ## One-time owner setup
 
-`ngrv` already exists on npm, so no bootstrap publication is needed. Register its
-trusted publisher using these settings:
+The `birthplace` name is claimed and released in three steps, in this order:
 
-| Setting           | Value            |
-| ----------------- | ---------------- |
-| npm package       | `ngrv`           |
-| GitHub owner      | `thilllon`       |
-| Repository        | `ngrv`           |
-| Workflow filename | `release.yml`    |
-| Environment       | Leave empty      |
-| Permission        | Allow publishing |
+1. The owner claims the name with a manual placeholder publish of version `0.0.0`.
+   npm can only attach a trusted publisher to a package that already exists, and
+   `package.json` stays at `0.0.0` until the first Changesets release. This is the
+   only manual publish; it is done once from the owner's machine, never by automation.
+2. The owner registers the npm trusted publisher for repository
+   `thilllon/birthplace` and workflow `release.yml` using these settings:
 
-An authenticated package owner with 2FA can use npm's native command:
+   | Setting           | Value            |
+   | ----------------- | ---------------- |
+   | npm package       | `birthplace`     |
+   | GitHub owner      | `thilllon`       |
+   | Repository        | `birthplace`     |
+   | Workflow filename | `release.yml`    |
+   | Environment       | Leave empty      |
+   | Permission        | Allow publishing |
 
-```sh
-npm trust github ngrv --repository thilllon/ngrv --file release.yml --allow-publish
-npm trust list ngrv
-```
+   An authenticated package owner with 2FA can use npm's native command:
+
+   ```sh
+   npm trust github birthplace --repository thilllon/birthplace --file release.yml --allow-publish
+   npm trust list birthplace
+   ```
+
+3. `release.yml` publishes `1.0.0`. The single major Changeset of the rename
+   workstream moves the version from `0.0.0` to exactly `1.0.0`, Changesets creates
+   `CHANGELOG.md` with that one entry, and the workflow publishes it through OIDC
+   with provenance. No `CHANGELOG.md` exists in the repository before that release.
 
 Allow GitHub Actions to create pull requests. Set repository Actions variable
 `NPM_PUBLISH_ENABLED=true` only after verifying trust. Before that, version PRs
@@ -90,7 +101,7 @@ latest main revision or to enable publication after owner setup.
 ```sh
 pnpm exec changeset status
 pnpm exec changeset publish-plan
-npm view ngrv version
+npm view birthplace version
 git ls-remote --tags origin
 ```
 

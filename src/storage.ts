@@ -8,35 +8,31 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { BuildInfo, validateBuildInfo } from "./build-info";
-import { NgrvError } from "./errors";
+import { Birthplace, validateBirthplace } from "./birthplace";
+import { BirthplaceError } from "./errors";
 
-export interface WriteBuildInfoOptions {
+export interface WriteBirthplaceOptions {
   file?: string;
   format?: "json" | "esm";
 }
 
-const jsonSource = (info: BuildInfo): string =>
+const jsonSource = (info: Birthplace): string =>
   `${JSON.stringify(info, null, 2)}\n`;
 
-export const writeBuildInfo = (
-  value: BuildInfo,
-  options: WriteBuildInfoOptions = {},
+export const writeBirthplace = (
+  value: Birthplace,
+  options: WriteBirthplaceOptions = {},
 ): string => {
-  const info = validateBuildInfo(value);
+  const info = validateBirthplace(value);
   const format = options.format ?? "json";
   const file = resolve(
-    options.file ?? (format === "esm" ? "build-info.mjs" : "build-info.json"),
+    options.file ?? (format === "esm" ? "birthplace.mjs" : "birthplace.json"),
   );
   const directory = dirname(file);
   const temporaryFile = `${file}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
   const source =
     format === "esm"
-      ? `const buildInfo = ${JSON.stringify(
-          info,
-          null,
-          2,
-        )};\n\nexport { buildInfo };\nexport default buildInfo;\n`
+      ? `export default ${JSON.stringify(info, null, 2)};\n`
       : jsonSource(info);
 
   try {
@@ -52,25 +48,25 @@ export const writeBuildInfo = (
         // Preserve the original write failure.
       }
     }
-    throw new NgrvError(
-      "NGRV_WRITE_ERROR",
+    throw new BirthplaceError(
+      "BIRTHPLACE_WRITE_ERROR",
       `Unable to write build metadata to ${file}`,
       error,
     );
   }
 };
 
-export const readBuildInfo = (file = "build-info.json"): BuildInfo => {
+export const readBirthplace = (file = "birthplace.json"): Birthplace => {
   const resolvedFile = resolve(file);
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(resolvedFile, "utf8"));
   } catch (error) {
-    throw new NgrvError(
-      "NGRV_READ_ERROR",
+    throw new BirthplaceError(
+      "BIRTHPLACE_READ_ERROR",
       `Unable to read build metadata from ${resolvedFile}`,
       error,
     );
   }
-  return validateBuildInfo(parsed);
+  return validateBirthplace(parsed);
 };

@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { BuildInfo, validateBuildInfo } from "./build-info";
-import { NgrvError } from "./errors";
+import { Birthplace, validateBirthplace } from "./birthplace";
+import { BirthplaceError } from "./errors";
 
-export interface CollectBuildInfoOptions {
+export interface CollectBirthplaceOptions {
   cwd?: string;
   env?: Readonly<Record<string, string | undefined>>;
   name?: string;
@@ -34,8 +34,8 @@ interface ProviderIdentity {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const collectError = (message: string, cause?: unknown): NgrvError =>
-  new NgrvError("NGRV_COLLECTION_ERROR", message, cause);
+const collectError = (message: string, cause?: unknown): BirthplaceError =>
+  new BirthplaceError("BIRTHPLACE_COLLECTION_ERROR", message, cause);
 
 const readPackageIdentity = (cwd: string): PackageIdentity => {
   const manifestFile = join(cwd, "package.json");
@@ -186,9 +186,9 @@ const timestampFromEpoch = (value: string): string => {
   return date.toISOString();
 };
 
-export const collectBuildInfo = (
-  options: CollectBuildInfoOptions = {},
-): BuildInfo => {
+export const collectBirthplace = (
+  options: CollectBirthplaceOptions = {},
+): Birthplace => {
   try {
     const cwd = resolve(options.cwd ?? process.cwd());
     const env = options.env ?? process.env;
@@ -202,7 +202,7 @@ export const collectBuildInfo = (
     const dirty = options.dirty ?? gitIdentity.dirty;
     const buildUrl = options.buildUrl ?? providerIdentity.buildUrl;
 
-    const build: BuildInfo["build"] = {
+    const build: Birthplace["build"] = {
       ...(buildUrl === undefined ? {} : { url: buildUrl }),
     };
     if (options.timestamp !== false) {
@@ -218,7 +218,7 @@ export const collectBuildInfo = (
       }
     }
 
-    const info = validateBuildInfo({
+    const info = validateBirthplace({
       schemaVersion: 1,
       service: {
         ...(name === undefined ? {} : { name }),
@@ -241,7 +241,10 @@ export const collectBuildInfo = (
     }
     return info;
   } catch (error) {
-    if (error instanceof NgrvError && error.code === "NGRV_COLLECTION_ERROR") {
+    if (
+      error instanceof BirthplaceError &&
+      error.code === "BIRTHPLACE_COLLECTION_ERROR"
+    ) {
       throw error;
     }
     throw collectError("Unable to collect build metadata", error);

@@ -15,19 +15,21 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  BuildInfo,
-  NgrvError,
-  collectBuildInfo,
-  readBuildInfo,
+  Birthplace,
+  BirthplaceError,
+  collectBirthplace,
+  readBirthplace,
   toOtelAttributes,
-  validateBuildInfo,
-  writeBuildInfo,
+  writeBirthplace,
 } from "../src";
+import * as publicApi from "../src";
+import { validateBirthplace } from "../src/birthplace";
+import * as otelApi from "../src/otel";
 
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = (): string => {
-  const directory = mkdtempSync(join(tmpdir(), "ngrv-build-info-"));
+  const directory = mkdtempSync(join(tmpdir(), "birthplace-"));
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -60,7 +62,7 @@ const makeUnbornRepository = (): string => {
   return cwd;
 };
 
-const completeInfo: BuildInfo = {
+const completeInfo: Birthplace = {
   schemaVersion: 1,
   service: { name: "fixture", version: "1.2.3" },
   source: { revision: "a".repeat(40), dirty: false },
@@ -71,12 +73,15 @@ const completeInfo: BuildInfo = {
   },
 };
 
-const expectNgrvError = (operation: () => unknown, code: string): void => {
+const expectBirthplaceError = (
+  operation: () => unknown,
+  code: string,
+): void => {
   try {
     operation();
     throw new Error("Expected operation to fail");
   } catch (error) {
-    expect(error).toBeInstanceOf(NgrvError);
+    expect(error).toBeInstanceOf(BirthplaceError);
     expect(error).toMatchObject({ code });
   }
 };
@@ -87,11 +92,11 @@ afterEach(() => {
   }
 });
 
-describe("collectBuildInfo", () => {
+describe("collectBirthplace", () => {
   it("collects package identity and the actual clean checkout revision", () => {
     const { cwd, initialCommit } = makeRepository();
 
-    expect(collectBuildInfo({ cwd, env: {}, timestamp: false })).toEqual({
+    expect(collectBirthplace({ cwd, env: {}, timestamp: false })).toEqual({
       schemaVersion: 1,
       service: { name: "fixture", version: "1.2.3" },
       source: { revision: initialCommit, dirty: false },
@@ -103,7 +108,7 @@ describe("collectBuildInfo", () => {
     const { cwd } = makeRepository();
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: {},
         name: "renamed-service",
@@ -117,7 +122,7 @@ describe("collectBuildInfo", () => {
     const { cwd, initialCommit } = makeRepository();
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { GITHUB_ACTIONS: "true", GITHUB_SHA: "b".repeat(40) },
         timestamp: false,
@@ -129,7 +134,7 @@ describe("collectBuildInfo", () => {
     const { cwd } = makeRepository();
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: {},
         revision: "c".repeat(64),
@@ -144,7 +149,7 @@ describe("collectBuildInfo", () => {
     writeFileSync(join(cwd, "untracked.txt"), "changed", "utf8");
 
     expect(
-      collectBuildInfo({ cwd, env: {}, timestamp: false }).source.dirty,
+      collectBirthplace({ cwd, env: {}, timestamp: false }).source.dirty,
     ).toBe(true);
   });
 
@@ -160,7 +165,7 @@ describe("collectBuildInfo", () => {
       new Date(manifestStat.mtimeMs + 10_000),
     );
 
-    collectBuildInfo({ cwd, env: {}, timestamp: false });
+    collectBirthplace({ cwd, env: {}, timestamp: false });
 
     expect(readFileSync(index)).toEqual(indexBefore);
     expect(existsSync(join(cwd, ".git", "index.lock"))).toBe(false);
@@ -169,16 +174,16 @@ describe("collectBuildInfo", () => {
   it("keeps dirty state but omits the unavailable revision for an unborn HEAD", () => {
     const cwd = makeUnbornRepository();
 
-    expect(collectBuildInfo({ cwd, env: {}, timestamp: false }).source).toEqual(
-      { dirty: true },
-    );
+    expect(
+      collectBirthplace({ cwd, env: {}, timestamp: false }).source,
+    ).toEqual({ dirty: true });
   });
 
   it("uses explicit and provider revisions when the checkout HEAD is unborn", () => {
     const cwd = makeUnbornRepository();
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: {},
         revision: "7".repeat(40),
@@ -186,7 +191,7 @@ describe("collectBuildInfo", () => {
       }).source,
     ).toEqual({ revision: "7".repeat(40), dirty: true });
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { GITHUB_ACTIONS: "true", GITHUB_SHA: "8".repeat(40) },
         timestamp: false,
@@ -201,9 +206,9 @@ describe("collectBuildInfo", () => {
     mkdirSync(dirname(referenceFile), { recursive: true });
     writeFileSync(referenceFile, "a".repeat(40), "utf8");
 
-    expectNgrvError(
-      () => collectBuildInfo({ cwd, env: {}, timestamp: false }),
-      "NGRV_COLLECTION_ERROR",
+    expectBirthplaceError(
+      () => collectBirthplace({ cwd, env: {}, timestamp: false }),
+      "BIRTHPLACE_COLLECTION_ERROR",
     );
   });
 
@@ -219,7 +224,7 @@ describe("collectBuildInfo", () => {
     const beforeEntries = readdirSync(cwd).sort();
     const beforeManifest = readFileSync(join(cwd, "package.json"), "utf8");
 
-    collectBuildInfo({ cwd, env, timestamp: false });
+    collectBirthplace({ cwd, env, timestamp: false });
 
     expect(env).toEqual(originalEnvironment);
     expect(process.env).toEqual(originalProcessEnvironment);
@@ -237,9 +242,9 @@ describe("collectBuildInfo", () => {
       "utf8",
     );
 
-    expect(collectBuildInfo({ cwd, env: {}, timestamp: false }).source).toEqual(
-      {},
-    );
+    expect(
+      collectBirthplace({ cwd, env: {}, timestamp: false }).source,
+    ).toEqual({});
   });
 
   it("uses a GitHub revision and build URL only with the GitHub Actions marker", () => {
@@ -253,7 +258,7 @@ describe("collectBuildInfo", () => {
     };
 
     expect(
-      collectBuildInfo({ cwd, env: providerEnvironment, timestamp: false }),
+      collectBirthplace({ cwd, env: providerEnvironment, timestamp: false }),
     ).toEqual({
       schemaVersion: 1,
       service: {},
@@ -263,7 +268,7 @@ describe("collectBuildInfo", () => {
       },
     });
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { ...providerEnvironment, GITHUB_ACTIONS: "false" },
         timestamp: false,
@@ -281,7 +286,7 @@ describe("collectBuildInfo", () => {
     };
 
     expect(
-      collectBuildInfo({ cwd, env: providerEnvironment, timestamp: false }),
+      collectBirthplace({ cwd, env: providerEnvironment, timestamp: false }),
     ).toEqual({
       schemaVersion: 1,
       service: {},
@@ -291,7 +296,7 @@ describe("collectBuildInfo", () => {
       },
     });
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { ...providerEnvironment, GITLAB_CI: "false" },
         timestamp: false,
@@ -308,7 +313,7 @@ describe("collectBuildInfo", () => {
     };
 
     expect(
-      collectBuildInfo({ cwd, env: providerEnvironment, timestamp: false }),
+      collectBirthplace({ cwd, env: providerEnvironment, timestamp: false }),
     ).toEqual({
       schemaVersion: 1,
       service: {},
@@ -317,7 +322,7 @@ describe("collectBuildInfo", () => {
     });
     for (const marker of ["0", "true", undefined]) {
       expect(
-        collectBuildInfo({
+        collectBirthplace({
           cwd,
           env: { ...providerEnvironment, VERCEL: marker },
           timestamp: false,
@@ -335,9 +340,9 @@ describe("collectBuildInfo", () => {
     };
 
     expect(
-      collectBuildInfo({ cwd, env, timestamp: false }).source.revision,
+      collectBirthplace({ cwd, env, timestamp: false }).source.revision,
     ).toBe(initialCommit);
-    const explicit = collectBuildInfo({
+    const explicit = collectBirthplace({
       cwd,
       env,
       revision: "c".repeat(40),
@@ -357,7 +362,7 @@ describe("collectBuildInfo", () => {
     };
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: {
           ...vercelEnvironment,
@@ -380,14 +385,14 @@ describe("collectBuildInfo", () => {
     // Providers are not merged: missing GitHub values are not filled from
     // Vercel.
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { ...vercelEnvironment, GITHUB_ACTIONS: "true" },
         timestamp: false,
       }),
     ).toEqual({ schemaVersion: 1, service: {}, source: {}, build: {} });
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: {
           ...vercelEnvironment,
@@ -408,7 +413,7 @@ describe("collectBuildInfo", () => {
     const cwd = makeTemporaryDirectory();
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "", VERCEL_URL: "" },
         timestamp: false,
@@ -427,7 +432,7 @@ describe("collectBuildInfo", () => {
       "fixture.vercel.app\n",
     ]) {
       expect(
-        collectBuildInfo({
+        collectBirthplace({
           cwd,
           env: {
             VERCEL: "1",
@@ -452,9 +457,9 @@ describe("collectBuildInfo", () => {
       { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "not-a-sha" },
       { GITHUB_ACTIONS: "true", GITHUB_SHA: "not-a-sha" },
     ]) {
-      expectNgrvError(
-        () => collectBuildInfo({ cwd, env, timestamp: false }),
-        "NGRV_COLLECTION_ERROR",
+      expectBirthplaceError(
+        () => collectBirthplace({ cwd, env, timestamp: false }),
+        "BIRTHPLACE_COLLECTION_ERROR",
       );
     }
   });
@@ -468,22 +473,22 @@ describe("collectBuildInfo", () => {
     );
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "a".repeat(40) },
         strict: true,
         timestamp: false,
       }).source,
     ).toEqual({ revision: "a".repeat(40) });
-    expectNgrvError(
+    expectBirthplaceError(
       () =>
-        collectBuildInfo({
+        collectBirthplace({
           cwd,
           env: { VERCEL: "1", VERCEL_GIT_COMMIT_SHA: "" },
           strict: true,
           timestamp: false,
         }),
-      "NGRV_COLLECTION_ERROR",
+      "BIRTHPLACE_COLLECTION_ERROR",
     );
   });
 
@@ -491,7 +496,7 @@ describe("collectBuildInfo", () => {
     const cwd = makeTemporaryDirectory();
 
     expect(
-      collectBuildInfo({ cwd, env: { SOURCE_DATE_EPOCH: "0" } }).build,
+      collectBirthplace({ cwd, env: { SOURCE_DATE_EPOCH: "0" } }).build,
     ).toEqual({
       timestamp: "1970-01-01T00:00:00.000Z",
       timestampSource: "source-date-epoch",
@@ -502,7 +507,7 @@ describe("collectBuildInfo", () => {
     const cwd = makeTemporaryDirectory();
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { SOURCE_DATE_EPOCH: "0" },
         timestamp: "2026-09-21T12:34:56.000Z",
@@ -517,8 +522,11 @@ describe("collectBuildInfo", () => {
     const cwd = makeTemporaryDirectory();
 
     expect(
-      collectBuildInfo({ cwd, env: {}, timestamp: "2026-09-21T21:34:56+09:00" })
-        .build,
+      collectBirthplace({
+        cwd,
+        env: {},
+        timestamp: "2026-09-21T21:34:56+09:00",
+      }).build,
     ).toEqual({
       timestamp: "2026-09-21T12:34:56.000Z",
       timestampSource: "explicit",
@@ -529,7 +537,7 @@ describe("collectBuildInfo", () => {
     const cwd = makeTemporaryDirectory();
     const earliest = Date.now();
 
-    const info = collectBuildInfo({ cwd, env: {} });
+    const info = collectBirthplace({ cwd, env: {} });
 
     const latest = Date.now();
     expect(info.build.timestampSource).toBe("clock");
@@ -545,7 +553,7 @@ describe("collectBuildInfo", () => {
     const cwd = makeTemporaryDirectory();
 
     expect(
-      collectBuildInfo({
+      collectBirthplace({
         cwd,
         env: { SOURCE_DATE_EPOCH: "123" },
         timestamp: false,
@@ -558,9 +566,9 @@ describe("collectBuildInfo", () => {
     (timestamp) => {
       const cwd = makeTemporaryDirectory();
 
-      expectNgrvError(
-        () => collectBuildInfo({ cwd, env: {}, timestamp }),
-        "NGRV_COLLECTION_ERROR",
+      expectBirthplaceError(
+        () => collectBirthplace({ cwd, env: {}, timestamp }),
+        "BIRTHPLACE_COLLECTION_ERROR",
       );
     },
   );
@@ -570,13 +578,13 @@ describe("collectBuildInfo", () => {
     (sourceDateEpoch) => {
       const cwd = makeTemporaryDirectory();
 
-      expectNgrvError(
+      expectBirthplaceError(
         () =>
-          collectBuildInfo({
+          collectBirthplace({
             cwd,
             env: { SOURCE_DATE_EPOCH: sourceDateEpoch },
           }),
-        "NGRV_COLLECTION_ERROR",
+        "BIRTHPLACE_COLLECTION_ERROR",
       );
     },
   );
@@ -585,32 +593,32 @@ describe("collectBuildInfo", () => {
     const cwd = makeTemporaryDirectory();
     writeFileSync(join(cwd, "package.json"), "{ definitely not json", "utf8");
 
-    expectNgrvError(
-      () => collectBuildInfo({ cwd, env: {}, timestamp: false }),
-      "NGRV_COLLECTION_ERROR",
+    expectBirthplaceError(
+      () => collectBirthplace({ cwd, env: {}, timestamp: false }),
+      "BIRTHPLACE_COLLECTION_ERROR",
     );
   });
 
   it("requires name, version, and revision in strict mode", () => {
     const cwd = makeTemporaryDirectory();
 
-    expectNgrvError(
-      () => collectBuildInfo({ cwd, env: {}, strict: true, timestamp: false }),
-      "NGRV_COLLECTION_ERROR",
+    expectBirthplaceError(
+      () => collectBirthplace({ cwd, env: {}, strict: true, timestamp: false }),
+      "BIRTHPLACE_COLLECTION_ERROR",
     );
   });
 });
 
-describe("BuildInfo validation and storage", () => {
+describe("Birthplace validation and storage", () => {
   it("accepts SHA-1 and SHA-256 revisions", () => {
     expect(
-      validateBuildInfo({
+      validateBirthplace({
         ...completeInfo,
         source: { revision: "1".repeat(40), dirty: false },
       }).source.revision,
     ).toBe("1".repeat(40));
     expect(
-      validateBuildInfo({
+      validateBirthplace({
         ...completeInfo,
         source: { revision: "2".repeat(64), dirty: false },
       }).source.revision,
@@ -622,7 +630,7 @@ describe("BuildInfo validation and storage", () => {
     ["2026-09-21T21:34:56+09:00", "2026-09-21T12:34:56.000Z"],
   ])("normalizes valid ISO timestamp %s", (timestamp, expected) => {
     expect(
-      validateBuildInfo({
+      validateBirthplace({
         ...completeInfo,
         build: { ...completeInfo.build, timestamp },
       }).build.timestamp,
@@ -673,26 +681,29 @@ describe("BuildInfo validation and storage", () => {
       },
     ],
   ])("rejects malformed metadata: %s", (_caseName, value) => {
-    expectNgrvError(() => validateBuildInfo(value), "NGRV_VALIDATION_ERROR");
+    expectBirthplaceError(
+      () => validateBirthplace(value),
+      "BIRTHPLACE_VALIDATION_ERROR",
+    );
   });
 
   it("round-trips validated JSON metadata", () => {
     const directory = makeTemporaryDirectory();
     const file = join(directory, "nested", "metadata.json");
 
-    expect(writeBuildInfo(completeInfo, { file })).toBe(file);
-    expect(readBuildInfo(file)).toEqual(completeInfo);
+    expect(writeBirthplace(completeInfo, { file })).toBe(file);
+    expect(readBirthplace(file)).toEqual(completeInfo);
     expect(readdirSync(dirname(file)).sort()).toEqual(["metadata.json"]);
   });
 
-  it("writes an importable ESM module with default and named exports", () => {
+  it("writes an importable ESM module with a default export only", () => {
     const directory = makeTemporaryDirectory();
     const file = join(directory, "metadata.mjs");
-    writeBuildInfo(completeInfo, { file, format: "esm" });
+    writeBirthplace(completeInfo, { file, format: "esm" });
 
     const script = [
-      `import buildInfo, { buildInfo as named } from ${JSON.stringify(pathToFileURL(file).href)};`,
-      "process.stdout.write(JSON.stringify({ buildInfo, named }));",
+      `import * as namespace from ${JSON.stringify(pathToFileURL(file).href)};`,
+      "process.stdout.write(JSON.stringify({ keys: Object.keys(namespace), value: namespace.default }));",
     ].join("\n");
     const imported = JSON.parse(
       execFileSync(
@@ -704,7 +715,12 @@ describe("BuildInfo validation and storage", () => {
       ),
     );
 
-    expect(imported).toEqual({ buildInfo: completeInfo, named: completeInfo });
+    expect(imported).toEqual({ keys: ["default"], value: completeInfo });
+  });
+
+  it("keeps the validator out of the public entry points", () => {
+    expect("validateBirthplace" in publicApi).toBe(false);
+    expect("validateBirthplace" in otelApi).toBe(false);
   });
 
   it("serializes only known fields", () => {
@@ -721,22 +737,22 @@ describe("BuildInfo validation and storage", () => {
         remote: "https://token@example.test/repository",
       },
       build: { ...completeInfo.build, host: "builder.internal" },
-    } as BuildInfo;
+    } as Birthplace;
 
-    writeBuildInfo(unsafe, { file });
+    writeBirthplace(unsafe, { file });
 
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual(completeInfo);
   });
 
-  it("reports write failures with a stable code and leaves no artifact", () => {
+  it("reports write failures with a stable code and leaves no birthplace file", () => {
     const directory = makeTemporaryDirectory();
     const blockingFile = join(directory, "blocking-file");
     const output = join(blockingFile, "metadata.json");
     writeFileSync(blockingFile, "not a directory", "utf8");
 
-    expectNgrvError(
-      () => writeBuildInfo(completeInfo, { file: output }),
-      "NGRV_WRITE_ERROR",
+    expectBirthplaceError(
+      () => writeBirthplace(completeInfo, { file: output }),
+      "BIRTHPLACE_WRITE_ERROR",
     );
     expect(existsSync(output)).toBe(false);
   });
@@ -744,14 +760,14 @@ describe("BuildInfo validation and storage", () => {
   it("reports a missing metadata file with a stable read code", () => {
     const file = join(makeTemporaryDirectory(), "missing.json");
 
-    expectNgrvError(() => readBuildInfo(file), "NGRV_READ_ERROR");
+    expectBirthplaceError(() => readBirthplace(file), "BIRTHPLACE_READ_ERROR");
   });
 
   it("reports corrupt JSON with a stable read code", () => {
     const file = join(makeTemporaryDirectory(), "metadata.json");
     writeFileSync(file, "{ broken json", "utf8");
 
-    expectNgrvError(() => readBuildInfo(file), "NGRV_READ_ERROR");
+    expectBirthplaceError(() => readBirthplace(file), "BIRTHPLACE_READ_ERROR");
   });
 });
 
@@ -772,9 +788,9 @@ describe("toOtelAttributes", () => {
       "service.name": "fixture",
       "service.version": "1.2.3",
       "vcs.ref.head.revision": "a".repeat(40),
-      "ngrv.source.dirty": false,
-      "ngrv.build.timestamp": "2026-09-21T00:00:00.000Z",
-      "ngrv.build.timestamp_source": "explicit",
+      "birthplace.source.dirty": false,
+      "birthplace.build.timestamp": "2026-09-21T00:00:00.000Z",
+      "birthplace.build.timestamp_source": "explicit",
       "cicd.pipeline.run.url.full": "https://ci.example.test/builds/42",
     });
   });
@@ -786,19 +802,19 @@ describe("toOtelAttributes", () => {
       source: {},
       build: {},
       username: "alice",
-    } as unknown as BuildInfo;
+    } as unknown as Birthplace;
 
     expect(toOtelAttributes(minimal)).toEqual({ "service.name": "fixture" });
   });
 
   it("validates metadata before converting it", () => {
-    expectNgrvError(
+    expectBirthplaceError(
       () =>
         toOtelAttributes({
           ...completeInfo,
           source: { revision: "not-a-commit" },
         }),
-      "NGRV_VALIDATION_ERROR",
+      "BIRTHPLACE_VALIDATION_ERROR",
     );
   });
 });

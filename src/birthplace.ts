@@ -1,8 +1,8 @@
-import { NgrvError } from "./errors";
+import { BirthplaceError } from "./errors";
 
 export type BuildTimestampSource = "clock" | "explicit" | "source-date-epoch";
 
-export interface BuildInfo {
+export interface Birthplace {
   schemaVersion: 1;
   service: {
     name?: string;
@@ -23,7 +23,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const validationError = (message: string): never => {
-  throw new NgrvError("NGRV_VALIDATION_ERROR", message);
+  throw new BirthplaceError("BIRTHPLACE_VALIDATION_ERROR", message);
 };
 
 function assertRecord(
@@ -93,8 +93,8 @@ const validateUrl = (value: string): void => {
   try {
     parsed = new URL(value);
   } catch (error) {
-    throw new NgrvError(
-      "NGRV_VALIDATION_ERROR",
+    throw new BirthplaceError(
+      "BIRTHPLACE_VALIDATION_ERROR",
       "build.url must be a valid URL",
       error,
     );
@@ -114,7 +114,7 @@ const validateUrl = (value: string): void => {
 /**
  * Validates metadata and returns a fresh object containing only the documented fields.
  */
-export const validateBuildInfo = (value: unknown): BuildInfo => {
+export const validateBirthplace = (value: unknown): Birthplace => {
   assertRecord(value, "Build metadata");
   if (value.schemaVersion !== 1) {
     validationError("schemaVersion must be 1");

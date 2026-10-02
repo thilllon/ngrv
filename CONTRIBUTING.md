@@ -21,7 +21,7 @@ pnpm test:example
 
 `pnpm format` rewrites formatting. The checks above do not modify source files.
 Unit tests use temporary repositories and require no build or cloud credentials.
-Packaging tests run after the build and inspect installed artifacts, type declarations,
+Packaging tests run after the build and inspect the installed package, type declarations,
 CLI behavior, and real OpenTelemetry spans.
 
 Hooks scan for secrets: Gitleaks checks staged changes before a commit, and
@@ -29,12 +29,12 @@ TruffleHog checks unpushed commits before a push and tries to verify what it fin
 CI repeats both scans over the whole pushed range. Mark an intentional
 credential-shaped test fixture with a `trufflehog:ignore` comment.
 
-Keep build metadata immutable after capture. Include the generated JSON in the
-application deployment; the runtime detector must never probe Git or regenerate it.
+Keep build metadata immutable after capture. Include the generated birthplace file in
+the application deployment; the runtime detector must never probe Git or regenerate it.
 
 ## Release changes
 
-Include a Changeset naming `ngrv` for publishable changes. Use major for breaking
+Include a Changeset naming `birthplace` for publishable changes. Use major for breaking
 API/runtime changes, minor for compatible features, and patch for fixes. Documentation,
 tests, and repository-only tooling do not require their own release.
 
