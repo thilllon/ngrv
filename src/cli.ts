@@ -3,12 +3,6 @@
 import { Command, Option } from "commander";
 import { collectBuildInfo, CollectBuildInfoOptions } from "./collect";
 import { NgrvError } from "./errors";
-import {
-  engrave,
-  engraveDefaultOptions,
-  readEngrave,
-  readEngraveDefaultOptions,
-} from "./ngrv";
 import { toOtelAttributes } from "./otel";
 import { readBuildInfo, writeBuildInfo } from "./storage";
 
@@ -28,6 +22,7 @@ const reportError = (error: unknown): void => {
 program
   .command("generate", { isDefault: true })
   .description("generate a validated build metadata artifact")
+  .allowExcessArguments(false)
   .option(
     "--cwd <directory>",
     "project directory used for package and Git discovery",
@@ -101,32 +96,6 @@ program
       }
     },
   );
-
-program
-  .command("create")
-  .alias("c")
-  .description("create a legacy .ngrv file (deprecated; use generate)")
-  .option(
-    "-d, --directory <directory>",
-    "directory where the ngrv files will be saved",
-    engraveDefaultOptions.outputDirectory,
-  )
-  .action(async ({ directory }) => {
-    engrave({ outputDirectory: directory });
-  });
-
-program
-  .command("read")
-  .alias("r")
-  .description("read a legacy .ngrv file (deprecated; use inspect)")
-  .option(
-    "-d, --directory <directory>",
-    "directory to read the ngrv files",
-    readEngraveDefaultOptions.directory,
-  )
-  .action(async ({ directory }) => {
-    readEngrave({ directory });
-  });
 
 program.parse(process.argv);
 

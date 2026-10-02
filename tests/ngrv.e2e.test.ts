@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -203,22 +204,22 @@ describe("built CLI", () => {
     expect(result.stderr).not.toBe("");
   });
 
-  it("keeps explicit legacy create/read commands and aliases available for migration", () => {
-    for (const [command, directory] of [
-      ["create", "created"],
-      ["c", "aliased"],
-    ] as const) {
-      const created = runCli(command, "-d", directory);
-      expect(created.status).toBe(0);
-      expect(
-        readFileSync(join(temporaryDirectory, directory, ".ngrv"), "utf8"),
-      ).toContain("NGRV_BUILT_AT=");
-    }
+  it.each(["create", "c", "read", "r"])(
+    "rejects the removed legacy %s command without writing an artifact",
+    (command) => {
+      const directory = join(temporaryDirectory, `removed-${command}`);
+      mkdirSync(directory);
 
-    for (const command of ["read", "r"]) {
-      const read = runCli(command, "-d", "created");
-      expect(read.status).toBe(0);
-      expect(read.stdout).toContain("[ngrv] Read from");
-    }
-  });
+      for (const args of [[command], [command, "-d", "."]]) {
+        const result = spawnSync(process.execPath, [cli, ...args], {
+          cwd: directory,
+          encoding: "utf8",
+        });
+
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).not.toBe("");
+      }
+      expect(readdirSync(directory)).toEqual([]);
+    },
+  );
 });

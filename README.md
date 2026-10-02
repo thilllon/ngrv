@@ -167,8 +167,8 @@ const attributes = toOtelAttributes(buildInfo);
 ## OpenTelemetry attributes
 
 `toOtelAttributes(info, options?)` validates the input and returns only defined values. The dedicated
-`ngrv/otel` entrypoint includes artifact reading and conversion, without loading the Git collector or
-legacy machine-information module. No OpenTelemetry SDK is installed as a runtime dependency.
+`ngrv/otel` entrypoint includes artifact reading and conversion, without loading the Git
+collector. No OpenTelemetry SDK is installed as a runtime dependency.
 
 | Build metadata    | Resource attribute           |
 | ----------------- | ---------------------------- |
@@ -226,23 +226,12 @@ steps with `ngrv generate --output dist/build-info.json --strict`, copy the arti
 package, and register `ngrvDetector` during SDK initialization. An old `.ngrv` file is not a valid
 JSON artifact; regenerate it during the build instead of renaming it.
 
-Explicit legacy commands, aliases, binaries, and root exports remain for gradual migration:
-
-```sh
-npx ngrv create --directory .    # alias: `c`
-npx ngrv read --directory .      # alias: `r`
-```
-
-```ts
-import { engrave, readEngrave } from 'ngrv';
-
-engrave();
-readEngrave();
-```
-
-These legacy calls write or read `.ngrv` and populate their own process's `process.env`. Running the
-legacy read CLI does not export variables into a parent shell or another app process. New build APIs
-and the OTel detector do not mutate the environment.
+The legacy surface is removed. The `create`/`c` and `read`/`r` commands, the `ngrv-global` and
+`ngrv:global` binaries, and the `engrave`/`readEngrave` root exports with their option types and
+defaults no longer exist, and the `NGRV_*` `process.env` type declarations are gone. Invoke the single
+`ngrv` binary, and replace `engrave()` and `readEngrave()` with `collectBuildInfo` plus
+`writeBuildInfo` at build time and `readBuildInfo` or `ngrvDetector` at runtime. NGRV no longer
+records build-machine values such as CPU, memory, user, or shell, and it never mutates `process.env`.
 
 ## Development
 
