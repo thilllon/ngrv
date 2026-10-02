@@ -7,7 +7,7 @@ Keep this file current with maintainer decisions. `CLAUDE.md` imports it.
 - Write code comments, repository documentation, issues, PRs, and commits in English.
 - Respond to the maintainer in their preferred language.
 - Keep NGRV focused on build-time capture and reading packaged metadata at runtime.
-  The OTel subpath must not load the Git collector or legacy machine discovery.
+  The OTel subpath must not load the Git collector.
 - Prefer standard OTel attributes; custom metadata remains opt-in. Document the
   semantic-convention version and stability level when changing mappings.
 

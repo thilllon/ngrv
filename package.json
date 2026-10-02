@@ -45,9 +45,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "ngrv": "dist/cli.cjs",
-    "ngrv-global": "dist/cli.cjs",
-    "ngrv:global": "dist/cli.cjs"
+    "ngrv": "dist/cli.cjs"
   },
   "files": [
     "dist"

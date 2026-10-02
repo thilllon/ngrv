@@ -105,17 +105,20 @@ assert.equal(typeof otel.ngrvDetector, 'function');
 Module._load = originalLoad;
 const root = require('ngrv');
 assert.equal(typeof root.collectBuildInfo, 'function');
-assert.equal(typeof root.engrave, 'function');
+assert.equal(root.engrave, undefined);
+assert.equal(root.readEngrave, undefined);
 `;
   writeFileSync(join(consumerDirectory, "commonjs.cjs"), commonJs);
   run(process.execPath, ["commonjs.cjs"]);
 
   const esm = `
 import assert from 'node:assert/strict';
-import { collectBuildInfo, engrave } from 'ngrv';
+import * as root from 'ngrv';
+import { collectBuildInfo } from 'ngrv';
 import { toOtelAttributes, ngrvDetector } from 'ngrv/otel';
 assert.equal(typeof collectBuildInfo, 'function');
-assert.equal(typeof engrave, 'function');
+assert.equal('engrave' in root, false);
+assert.equal('readEngrave' in root, false);
 assert.equal(typeof ngrvDetector, 'function');
 assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, source: {}, build: {} }), { 'service.name': 'esm' });
 `;
@@ -132,11 +135,7 @@ assert.deepEqual(toOtelAttributes({ schemaVersion: 1, service: { name: 'esm' }, 
   const installedManifest = JSON.parse(
     readFileSync(join(installedPackageDirectory, "package.json"), "utf8"),
   );
-  assert.deepEqual(Object.keys(installedManifest.bin).sort(), [
-    "ngrv",
-    "ngrv-global",
-    "ngrv:global",
-  ]);
+  assert.deepEqual(Object.keys(installedManifest.bin), ["ngrv"]);
   for (const target of Object.values(
     installedManifest.bin as Record<string, string>,
   )) {
