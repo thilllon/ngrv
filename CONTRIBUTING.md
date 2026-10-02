@@ -24,6 +24,11 @@ Unit tests use temporary repositories and require no build or cloud credentials.
 Packaging tests run after the build and inspect installed artifacts, type declarations,
 CLI behavior, and real OpenTelemetry spans.
 
+Hooks scan for secrets: Gitleaks checks staged changes before a commit, and
+TruffleHog checks unpushed commits before a push and tries to verify what it finds.
+CI repeats both scans over the whole pushed range. Mark an intentional
+credential-shaped test fixture with a `trufflehog:ignore` comment.
+
 Keep build metadata immutable after capture. Include the generated JSON in the
 application deployment; the runtime detector must never probe Git or regenerate it.
 

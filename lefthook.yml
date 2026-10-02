@@ -20,3 +20,5 @@ pre-push:
       run: mise exec -- pnpm build
     types:
       run: mise exec -- pnpm typecheck
+    verified-secrets:
+      run: mise exec -- trufflehog git file://. --since-commit origin/main --branch HEAD --results=verified,unknown --fail --no-update

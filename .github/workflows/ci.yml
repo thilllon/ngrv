@@ -57,16 +57,42 @@ jobs:
       - run: pnpm build
       - run: pnpm test:packaging
       - run: pnpm --dir example test
-      - name: Scan tracked changes for secrets
-        run: gitleaks git --redact --no-banner --log-opts='-1' .
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LEFTHOOK: '0'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+      - name: Scan the pushed commit range with Gitleaks and TruffleHog
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE_SHA" ] && git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            gitleaks git --redact --no-banner --log-opts="$BASE_SHA..$GITHUB_SHA" .
+            trufflehog git file://. --since-commit "$BASE_SHA" --branch HEAD \
+              --results=verified,unknown --fail --no-update
+          else
+            gitleaks git --redact --no-banner --log-opts='-1' .
+            trufflehog git file://. --max-depth=1 --branch HEAD \
+              --results=verified,unknown --fail --no-update
+          fi
 
   validate:
     name: Validate
-    needs: test
+    needs: [test, secrets]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Require every runtime check to pass
         env:
           TEST_RESULT: ${{ needs.test.result }}
-        run: test "$TEST_RESULT" = success
+          SECRETS_RESULT: ${{ needs.secrets.result }}
+        run: test "$TEST_RESULT" = success && test "$SECRETS_RESULT" = success
