@@ -1,5 +1,11 @@
 # birthplace
 
+## 1.0.1
+
+### Patch Changes
+
+- 7a0d98e: Refresh the README shipped with the package.
+
 ## 1.0.0
 
 ### Major Changes

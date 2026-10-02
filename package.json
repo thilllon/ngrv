@@ -1,6 +1,6 @@
 {
   "name": "birthplace",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Record where and when an artifact was built and load it into OpenTelemetry Node.js resources",
   "keywords": [
     "opentelemetry",
